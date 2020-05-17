@@ -3,11 +3,13 @@
 
 #include "err_exit.h"
 
+
 #include "defines.h"
 
 #include "shared_memory.h"
 
 #include "semaphore.h"
+#include <sys/sem.h>
 
 #include "fifo.h"
 
@@ -24,8 +26,7 @@
 #include <sys/types.h>
 
 
-#
-define ACK_LIST_SIZE 100
+#define ACK_LIST_SIZE 100
 
 // Limite righe lette dal file posizioni
 # define LIMITE_POSIZIONI 10
@@ -37,10 +38,10 @@ define ACK_LIST_SIZE 100
 // prima fork ack_manager poi for loop e fork device
 
 // struttura contenente matrice (-> board)
-struct board {
+typedef struct{
   pid_t board[10][10];
-};
-typedef struct board board_t;
+} board_t;
+
 
 // struttura di un singolo messaggio acknowledge
 typedef struct {
@@ -48,8 +49,7 @@ typedef struct {
   pid_t pid_receiver;
   int message_id;
   time_t timestamp;
-}
-Acknowledgment;
+} Acknowledgment;
 
 // matrice delle posizioni
 int positionMatrix[LIMITE_POSIZIONI][10];
@@ -82,6 +82,10 @@ int main(int argc, char * argv[]) {
   //
   //
 
+	// semafori
+	int semID = 0;
+
+
   // board
   int shm_boardId = 0; // Chiave di accesso
   board_t * board; // Puntatore a prima cella array (-> prima cella tabella)
@@ -100,7 +104,24 @@ int main(int argc, char * argv[]) {
   char * path2file = argv[2];
   open_filePosition(path2file);
 
-  //TODO: creazione, inizializzazione semafori
+	//##############: Creazione e inizializzazione insieme di semafori
+
+	/* Creazione insieme di semafori {scacchiera, D1, D2, D3, D4, D5, listaACK}*/
+	printf("\n<Server> Creation semaphore set [...]");
+	semID = semget(IPC_PRIVATE, 7, S_IRUSR | S_IWUSR);
+	if(semID==-1)
+		errExit("<Server> Semaphore creation failed!");
+
+	/*Inizializzazione:*/
+
+	unsigned short semInitVal[] = {0, 0, 0, 0, 0, 0, 0};
+	union semun arg;
+	arg.array = semInitVal;
+
+	if (semctl(semID, 0 /*ignored*/, SETALL, arg) == -1)
+		errExit("<Server> initialization semaphore set failed");
+
+  printf("\n## ## ## ## ## ## ## ##\n");
 
   //############## Allocazione shared memory per la BOARD
   printf("\n<Server> Allocation shared memory board [...]");
@@ -146,7 +167,14 @@ int main(int argc, char * argv[]) {
     exit(0); //??
   }
 
-  //TODO: cancellazione semafori
+  printf("\n## ## ## ## ## ## ## ##\n");
+
+  //############## Eliminazione insieme dei semafori
+	printf("\n<Server> Removing semaphore set [...]");
+	if (semctl(semID, 0 , IPC_RMID, NULL) == -1)
+        errExit("semctl IPC_RMID failed");
+
+  printf("\n## ## ## ## ## ## ## ##\n");
 
   //############## Detach shared memory BOARD
   printf("\n<Server> Detaching shared memory board [...]");
@@ -226,3 +254,4 @@ void open_filePosition(char * path2file) {
   // chiusura del file descriptor
   close(fd);
 }
+
