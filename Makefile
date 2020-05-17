@@ -1,4 +1,4 @@
-CFLAGS   = -Wall -std=gnu99
+makCFLAGS   = -Wall -std=gnu99
 INCLUDES = -I .
 OBJDIR   = obj
 
