@@ -9,11 +9,11 @@
  * index of a semaphore in the set, sem_op is the operation performed on sem_num
  */
 
-
 union semun {
 	int val;
 	struct semid_ds * buf;
 	unsigned short * array;
 };
 
+// Sostituisce la system call semop rendendola più agibile eliminando la necessità dei flag
 void semOp (int semid, unsigned short sem_num, short sem_op);

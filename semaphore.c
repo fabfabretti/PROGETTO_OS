@@ -5,9 +5,11 @@
 #include "err_exit.h"
 #include "semaphore.h"
 #include <sys/sem.h>
-
+#include <errno.h>
 #include "semaphore.h"
-/*
+#include <stdio.h>
+
+// Sostituisce la system call semop rendendola più agibile eliminando la necessità dei flag
 void semOp (int semid, unsigned short sem_num, short sem_op) {
     struct sembuf sop = {.sem_num = sem_num, .sem_op = sem_op, .sem_flg = 0};
 
@@ -15,15 +17,3 @@ void semOp (int semid, unsigned short sem_num, short sem_op) {
         errExit("semop failed");
 }
 
-*/
-
-
-void semOp (int semid, unsigned short sem_num, short sem_op) {
-    struct sembuf sop[1];
-    sop[0].sem_num=sem_num;
-    sop[0].sem_op=sem_op;
-    sop[0].sem_flg=0;
-
-    if (semop(semid,sop,1) == -1)
-		errExit("<semaphore> semop failed");
-}
