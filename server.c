@@ -14,6 +14,8 @@
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <dirent.h>
+#include <string.h>
 
 #define ACK_LIST_SIZE 100
 
@@ -51,6 +53,7 @@ int positionMatrix[LIMITE_POSIZIONI][10];
 void open_filePosition(char * path2file);
 void printBoard(board_t * board);
 void printPosition();
+int cleanFifoFolder();
 
 //
 //
@@ -89,9 +92,9 @@ int main(int argc, char * argv[]) {
   printf("\n--Inizializzazioni-- \n");
   // Appertura del file indicato nell'argomento inserito da termniale
   char * path2file = argv[2];
+	printf("[✓] File posizioni caricato:\n");
   open_filePosition(path2file);
 	printPosition();
-	printf("[✓] File posizioni caricato\n");
 
 
 	//Creazione e inizializzazione insieme di SEMAFORI
@@ -170,7 +173,7 @@ int main(int argc, char * argv[]) {
 
 				int nextrow=positionMatrix[0][2*child];
 				int nextcol=positionMatrix[0][2*child+1];
-        printf("[✓] <D%d %d> --> %d,%d\n",child,getpid(),nextrow,nextcol);
+        //printf("[✓] <D%d %d> --> %d,%d\n",child,getpid(),nextrow,nextcol);
 				board->board[nextrow][nextcol]=getpid();
 
         semOp(semID, (unsigned short)(child == 4) ? 0 : child + 1, 1);
@@ -212,7 +215,10 @@ int main(int argc, char * argv[]) {
   if (semctl(semID, 0, IPC_RMID, NULL) == -1)
     errExit("[x] semctl IPC_RMID failed");
 	printf("[✓] Semafori deallocati e rimossi\n");
-	
+
+	if(cleanFifoFolder()!=0)
+		errExit("[x] Non sono riuscito a pulire la cartella ./fifo");
+
  
   printf("[✓] Programma terminato! :D\n");
 }
@@ -317,3 +323,34 @@ int main(int argc, char * argv[]) {
 
 
 	}
+
+
+
+int cleanFifoFolder(){
+
+// These are data types defined in the "dirent" header
+    DIR *cartellaFifo = opendir("./fifo");
+		if(cartellaFifo==NULL)
+				errExit("[x] Qualcosa è andato storto nell'apertura della cartella");
+    struct dirent *next_file;
+    char filepath[300];
+
+    while ( (next_file = readdir(cartellaFifo)) != NULL )
+    {
+        // build the path for each file in the folder
+        sprintf(filepath, "%s/%s", "./fifo", next_file->d_name);
+
+				if (!(strcmp(next_file->d_name,"..") == 0) &&
+            !(strcmp(next_file->d_name,"." ) == 0) )
+						        if(remove(filepath)!=0)
+												errExit("[x] Qualcosa è andato storto nella pulizia delle fifo!");
+    }
+    closedir(cartellaFifo);
+
+
+		printf("[✓] Cartella fifo ripulita\n");
+
+		return 0;
+	
+	
+}
