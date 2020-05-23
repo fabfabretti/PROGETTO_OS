@@ -3,7 +3,7 @@
 ///         specifiche per la gestione della MEMORIA CONDIVISA.
 
 #pragma once
-   //TODO
+//TODO
 #include <stdlib.h>
 
 // The alloc_shared_memory method creates, if it does not exist, a shared
@@ -15,12 +15,12 @@ int alloc_shared_memory(key_t shmKey, size_t size);
 // of the calling process.
 // It returns a pointer to the attached shared memory segment,
 // otherwise it terminates the calling process
-void *get_shared_memory(int shmid, int shmflg);
+void * get_shared_memory(int shmid, int shmflg);
 
 // The free_shared_memory detaches a shared memory segment from the logic
 // address space of the calling process.
 // If it does not succeed, it terminates the calling process
-void free_shared_memory(void *ptr_sh);
+void free_shared_memory(void * ptr_sh);
 
 // The remove_shared_memory removes a shared memory segment
 // If it does not succeed, it terminates the calling process

@@ -16,16 +16,17 @@
 int alloc_shared_memory(key_t shmKey, size_t size) {
   // get, or create, a shared memory segment
   int shmid = shmget(shmKey, size, IPC_CREAT | S_IRUSR | S_IWUSR);
+
   if (shmid == -1)
     errExit("[x] <shared memory> shmget fallita");
 
   return shmid;
 }
 
-
 void * get_shared_memory(int shmid, int shmflg) {
   // attach the shared memory
   void * ptr_sh = shmat(shmid, NULL, shmflg);
+	
   if (ptr_sh == (void * ) - 1)
     errExit("[x] <shared memory> shmat fallita");
 
