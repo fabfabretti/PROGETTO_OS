@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <signal.h>
 
 /*
 #include "err_exit.h"
@@ -32,6 +33,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+include <signal.h>
 
 #define ACK_LIST_SIZE 100
 */
@@ -40,3 +42,11 @@
 #define BUFFER_FILEPOSIZIONI 20
 
 void open_filePosition(char* path2file);
+
+typedef struct {
+  pid_t pid_sender;
+  pid_t pid_receiver;
+	int message_id;
+	double max_distance;
+	char message[256];
+} message;
