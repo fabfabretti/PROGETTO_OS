@@ -91,6 +91,11 @@ int main(int argc, char * argv[]) {
 	// Assegnazione pid receiver
 	printf("[+] Insert the pid of the device which will receive the message: ");
 	scanf("%d",&msg.pid_receiver);
+
+
+  printf("[+] Inserire id messaggio:");
+	scanf("%d",&msg.message_id);
+
 	
 	// Assegnazione del messaggio	
 	printf("[+] Insert the message to send: ");
@@ -119,6 +124,7 @@ int main(int argc, char * argv[]) {
 	write(fd, &msg, sizeof(msg));
   
 
+printf("[✓] Message [hopefully] sent to device %d\n",msg.pid_receiver);
 
 	close(fd);
 	return 0;

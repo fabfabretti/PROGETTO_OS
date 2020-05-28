@@ -265,11 +265,13 @@ cleanFifoFolder();
 				message msg;
 				
 				ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
-				
+				if(bR==-1)
+					errExit("[x] Device couldn't read fifo :(");
 
-				while(bR != 0){
+				if(bR!=0){
 					printf("[+]***************** Mi sa che ho letto qualcosa\n");
-					ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
+					
+					printf("\n\tPid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:\n\t|%s-", msg.pid_receiver, msg.pid_sender, msg.max_distance, msg.message_id, msg.message);
 				}
 
 			
