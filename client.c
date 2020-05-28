@@ -4,6 +4,8 @@
 #include "defines.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "err_exit.c"
+#include <string.h>
 
 /*
 i client
@@ -37,6 +39,22 @@ diverso id) a più device.
 • Il message_id passato dall’utente al client deve essere univoco
 */
 
+////////////////////////////////////////////////
+//       			VARIABILI GLOBALI	      			  //
+////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////
+//       	 PROTOTIPI FUNZIONI	         			  //
+////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////
+//     				  	 MAIN				         			  //
+////////////////////////////////////////////////
+
 int main(int argc, char * argv[]) {
 
 	//controllo utilizzo!
@@ -44,8 +62,24 @@ int main(int argc, char * argv[]) {
 		printf("[x] Usage : %s msg_queue_id\n",argv[0]);
 		exit(1);
 	}
-	
+
+
+
+  ////////////////////////////////////////////////
+  //       			VARIABILI					      			  //
+  ////////////////////////////////////////////////
+
+
+
 	message msg;
+
+
+
+  ////////////////////////////////////////////////
+  //   				CODICE PROGRAMMA								  //
+  ////////////////////////////////////////////////
+
+
 
 	// Assegnazione della chiave (linea di comando)
 	msg.message_id = atoi(argv[1]);
@@ -70,9 +104,22 @@ int main(int argc, char * argv[]) {
 	scanf("%lf",&msg.max_distance);
 
 	//debug
-	printf("[?] Mando messaggio [%s] a device %d",msg.message,msg.pid_receiver);
+	//printf("[?] Mando messaggio [%s] a device %d",msg.message,msg.pid_receiver);
+
+	char path2fifo[100];
+	
+	char * fifopathbase = "./fifo/dev_fifo.";
+
+	sprintf(path2fifo, "./fifo/dev_fifo.%d\n", msg.pid_receiver);
+
+	// Creazione fifo (col nome appropriato appena trovato.)
+	int fd = open(path2fifo, O_WRONLY);
+	//se ci sono errori
+
+	write(fd, &msg, sizeof(msg));
+  
 
 
-
-   return 0;
+	close(fd);
+	return 0;
 }

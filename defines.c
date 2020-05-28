@@ -14,7 +14,7 @@
 
 #define BUFFER_FILEPOSIZIONI 20
 
-// La funzione calcola la distanza euclidea tra due device 
+// La funzione calcola la distanza euclidea tra due device sulla board
 double distanceCalculator(int x1, int y1, int x2, int y2){
 
 	return sqrt((pow((x2 - x1), 2) + (pow((y2 - y1), 2))));

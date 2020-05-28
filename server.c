@@ -15,6 +15,8 @@
 
 #include <errno.h>
 
+#include <string.h>
+
 #include <fcntl.h>
 
 #include <stdio.h>
@@ -48,7 +50,7 @@
 pid_t child_pid[5];
 
 // Limite righe lette dal file posizioni
-#define LIMITE_POSIZIONI 10
+#define LIMITE_POSIZIONI 100
 
 // struttura contenente matrice (-> board)
 typedef struct {
@@ -83,7 +85,8 @@ int shm_ackmsgID = 0;
 // Puntatore a prima cella array (-> lista acknowledge)
 Acknowledgment * ack_list; 
 
-char * path2file;
+char * path2file; //(file posizioni)
+
 
 
 ////////////////////////////////////////////////
@@ -121,7 +124,7 @@ int main(int argc, char * argv[]) {
     printf("Usage: %s msq_key | %s miss file_posizioni.txt path\n", argv[0], argv[1]);
     exit(1);
   }
-
+cleanFifoFolder();
 
 
   ////////////////////////////////////////////////
@@ -132,6 +135,9 @@ int main(int argc, char * argv[]) {
 
 	// Puntatore alla stringa che conteine il path del file posizioni
 	path2file = argv[2];
+
+	// Array contente i file descriptor usati per le open delle fifo
+	int fd_fifo[5] = {0, 0, 0, 0, 0};
 
 
 
@@ -200,7 +206,8 @@ int main(int argc, char * argv[]) {
 
 
   printf("\n -- Operations -- \n");
-
+	
+	// Ciclo di fork
   for (int child = 0; child < 5; child++) {
     // pid associato a ogni device
     pid_t pid = fork();
@@ -212,16 +219,16 @@ int main(int argc, char * argv[]) {
     // CODICE ESEGUITO DAL i-ESIMO FIGLIO
     if (pid == 0) {
 
-      //printf("[✓] <D%d> I'm alive! Il mio pid è %d.\n",child, getpid());
+      //printf("[✓] <D%d> I'm alive! My pid is %d.\n",child, getpid());
 
       // Formulazione del path di ogni fifo legata al pid di ogni processo device.
-      char * fifopathbase = "./fifo/dev_fifo.";
 
       char path2fifo[100];
 
       sprintf(path2fifo, "./fifo/dev_fifo.%d\n", getpid());
 
       // Creazione fifo (col nome appropriato appena trovato.)
+			
       if (mkfifo(path2fifo, S_IRUSR | S_IWUSR) == -1)
         errExit("\n[x] A device failed to create the fifo");
       //printf("\n[✓] <D%d> Ho creato la fifo %s", child,path2fifo);
@@ -229,7 +236,14 @@ int main(int argc, char * argv[]) {
 
 			// Gestione del server della lettura e del muovimento 
 			// 2s attesi alla fine del movimento del device D5.
-			
+			int fd_fifo = open(path2fifo, O_RDONLY | O_NONBLOCK);
+
+			if (fd_fifo == -1)
+				errExit("[x] Device Could not open fifo :(");
+
+			printf("<D%d> Ho aperto la fifo! >:P\n", child);		
+
+		
 			int step = 0;
 
 			while(positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI){				
@@ -244,6 +258,20 @@ int main(int argc, char * argv[]) {
 				// 	QUESTA ZONA è MUTUALMENTE ESCLUSIVA!!!!   //
 				//    printf("[%d] ayy\n\n",child);						//
 				////////////////////////////////////////////////
+
+				// figlio guarda se qualcuno ha pensato bene di scrivere sulla fifo
+
+
+			message msg;
+			ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
+
+			if(bR==-1)
+				errExit("[x] Couldn't read from fifo");
+
+			if(bR != 0)
+					printf("[+]***************** Mi sa che ho letto qualcosa\n");
+				
+
 
 
 				
@@ -286,14 +314,20 @@ int main(int argc, char * argv[]) {
   ////////////////////////////////////////////////
 	
 	clearBoad(board);
-	
+
+//APERTURA fifo in scrittura (ondevitare blocco dei child finché non arriva il client)
+
+
+	// Ciclo di spostamento dei device
 	int step;
 
-	
 	for(step = 0; positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI; step++){
 
 		//apri il semaforo del primo device
 		semOp(semID,5,-1);
+
+
+
 		printf("\n\n===== [✓] Step's beginning  %d\n",step);
 
 		/* Messaggio da stampare
@@ -317,6 +351,30 @@ int main(int argc, char * argv[]) {
 		clearBoad(board);
 
 		semOp(semID, 0, 1);
+/*
+		//--> apre la fifo se lo step è 0 (ovvero all'inizio)
+		if (step == 0){
+
+			// Ciclo di appertura in scrittura delle fifo da parte dei device i-esimo
+			for(int i = 0; i < 5; i++){
+
+				// Formulazione del path di ogni fifo legata al pid di ogni processo device.
+				char path2fifo[100];
+
+				sprintf(path2fifo, "./fifo/dev_fifo.%d\n", child_pid[i]);
+				printf("[?] Sto aprendo la fifo %s", path2fifo);
+
+				// Appertura della fifo in non_block mode quando è in read only
+				
+
+				//se la fifo non c'è, amen
+				fd_fifo[i] = open(path2fifo, O_RDONLY | O_NONBLOCK);
+				
+
+			}
+		}*/
+
+
 
 		// Inizio timer (2s) di attesa post-muovimento
 		sleep(2);
@@ -430,12 +488,7 @@ void open_filePosition(char * path2file) {
   if (row < LIMITE_POSIZIONI - 1) {
     positionMatrix[row - 1][0] = 999;
   }
-
 	
-
-
-
-
   // chiusura del file descriptor
   close(fd);
 }
