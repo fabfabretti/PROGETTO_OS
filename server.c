@@ -262,19 +262,17 @@ cleanFifoFolder();
 				// figlio guarda se qualcuno ha pensato bene di scrivere sulla fifo
 
 
-			message msg;
-			ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
+				message msg;
+				
+				ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
+				
 
-			if(bR==-1)
-				errExit("[x] Couldn't read from fifo");
-
-			if(bR != 0)
+				while(bR != 0){
 					printf("[+]***************** Mi sa che ho letto qualcosa\n");
-				
+					ssize_t bR = read(fd_fifo,&msg,sizeof(msg));
+				}
 
-
-
-				
+			
 				// Calcolo posizione i-esimo device (row, col)
 				int nextrow = positionMatrix[step][2 * child];
 				int nextcol = positionMatrix[step][2 * child + 1];
@@ -377,7 +375,7 @@ cleanFifoFolder();
 
 
 		// Inizio timer (2s) di attesa post-muovimento
-		sleep(2);
+		sleep(10);
 
 		printBoard(board);
 
