@@ -43,6 +43,8 @@
 // Matrice delle coordinate dei devices nel tempo
 int positionMatrix[LIMITE_POSIZIONI][10];
 
+// Tempo di attesa post movimento D5
+#define SLEEP_TIME 6
 
 
 // Strutture dati

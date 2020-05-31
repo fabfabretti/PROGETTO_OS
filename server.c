@@ -177,12 +177,11 @@ int main(int argc, char * argv[]) {
       if (fd_fifo == -1)
         errExit("[x] Device Could not open fifo :(");
 
-      printf("<D%d> Ho aperto la fifo! >:P\n", child);
+      //printf("<D%d> Ho aperto la fifo! >:P\n", child);
 
       int step = 0;
 
       while (positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI) {
-				
         semOp(semID, child, -1);
 
         ////////////////////////////////////////////////
@@ -212,8 +211,7 @@ int main(int argc, char * argv[]) {
 					if (bR != 0) {
 						// DEBUG: print del messaggio 
 						/*printf("\n\nDevice %d GIRO: %d\n",child, giro);*/
-						printf("\n[+]**** Mi sa che ho letto qualcosa di nuovo\n");
-									
+						printf("\n[+]**** Mi sa che ho letto qualcosa di nuovo\n");			
 
 						// Scrittura del messaggio nell'array inbox alla riga lastposition
 						inbox_t msgarrivo = { 
@@ -224,33 +222,49 @@ int main(int argc, char * argv[]) {
 						inbox[lastposition] = msgarrivo;
 
 						lastposition++;
-						
 					}
 				}while(bR != 0);
 
 				// DEBUG: stampa del messaggio nell'array di inbox
 				for(int i = 0; i < lastposition; i++){
-					if(inbox[i].firstSent != 0)
-						printf("\n< Inbox D%d>\n\tPid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n",child, inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
+					if(inbox[i].firstSent == 0)
+						printf("\n< Inbox D%d >\n\tPid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n",child, inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
 				}
 
+				//						abbiamo un messaggio	Ho ancora questo messaggio?
+				//												|									|
+				//												v									v
+				for(int i = 0; i < lastposition; i++){
+					for(int receiver = 0; receiver < 0 && inbox[i].firstSent==0; receiver++){
+						// Condizioni: 1) distanza appropriata 2) non primo step 3) receiver != sender
+						if(distanceCalculator(
+							positionMatrix[step - 1][2 * child], 
+							positionMatrix[step - 1][2 * child+1], 
+							positionMatrix[step - 1][2 * receiver], 
+							positionMatrix[step - 1][2 * receiver+1]) < inbox[i].msg.max_distance && step != 0 && receiver != child){
+								//mandare il messaggio via fifo :O
+								inbox[i].firstSent = 1;
+						}
+					}
+				}
 
-        // Calcolo posizione i-esimo device (row, col)
-        int nextrow = positionMatrix[step][2 * child];
-        int nextcol = positionMatrix[step][2 * child + 1];
+				// Calcolo posizione i-esimo device (row, col) [post invio e ricezione]
+				int nextrow = positionMatrix[step][2 * child];
+				int nextcol = positionMatrix[step][2 * child + 1];
 
-        board -> board[nextrow][nextcol] = getpid();
+				board -> board[nextrow][nextcol] = getpid();
 
-        step++;
+				// Passaggio allo step successivo
+				step++;
 
-        // L'appertura non è circolare.
-        // Il server si occupa di settare il primo semaforo a 1
-        if (child != 4)
-          semOp(semID, child + 1, 1);
+				// L'appertura non è circolare.
+				// Il server si occupa di settare il primo semaforo a 1
+				if (child != 4)
+					semOp(semID, child + 1, 1);
 
-        if (child == 4) {
-          semOp(semID, 5, 1); //riapri l'accesso alla board x il server
-        }
+				if (child == 4) {
+					semOp(semID, 5, 1); //riapri l'accesso alla board x il server
+				}
       }
 
       exit(0);
@@ -275,18 +289,7 @@ int main(int argc, char * argv[]) {
     //apri il semaforo del primo device
     semOp(semID, 5, -1);
 
-    printf("\n\n===== [✓] Step's beginning  %d\n", step);
-
-    /* Messaggio da stampare
-    # Step i: device positions ########################
-    	pidD1 i_D1 j_D1 msgs: lista message_id
-    	pidD2 i_D2 j_D2 msgs: lista message_id
-    	pidD3 i_D3 j_D3 msgs: lista message_id
-    	pidD4 i_D4 j_D4 msgs: lista message_id
-    	pidD5 i_D5 j_D5 msgs: lista message_id 
-    	#############################################
-    */
-
+    printf("\n\n===== [✓] Step %d\n", step);
     printf("\nStep %d: device positions ########################", step);
     printf("\nD1 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 0], positionMatrix[step][2 * 0 + 1]);
     printf("\nD2 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 1], positionMatrix[step][2 * 1 + 1]);
@@ -298,6 +301,12 @@ int main(int argc, char * argv[]) {
     clearBoad(board);
 
     semOp(semID, 0, 1);
+
+    // Inizio timer (2s) di attesa post-muovimento
+		// Sleep di n secondi (delta tempo tra muovimento ultimo device e ripresa operazioni)
+		sleep(SLEEP_TIME);
+
+    printBoard(board);
     /*
     		//--> apre la fifo se lo step è 0 (ovvero all'inizio)
     		if (step == 0){
@@ -321,18 +330,13 @@ int main(int argc, char * argv[]) {
     			}
     		}*/
 
-    // Inizio timer (2s) di attesa post-muovimento
-    sleep(10);
-
-    printBoard(board);
-
     printf("\n===== [✓] Step %d's ending\n", step);
   }
 
   // Prima di procedere con la chiusura attende la terminazione dei device.
-  while (wait(NULL) != -1);
+  while(wait(NULL) != -1);
 
-  // Qui i figli sono morti :( 
+  //DEBUG: qui i figli sono morti :( 
   printf("\n[✓] Tutti i bambini sono andati a letto.\n");
 
   ////////////////////////////////////////////////

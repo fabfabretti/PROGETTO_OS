@@ -82,8 +82,12 @@ int main(int argc, char * argv[]) {
   // Assegnazione MAX DISTANCE
   printf("[+] Insert the maximum distance the message will reach: ");
   scanf("%lf", &msg.max_distance);
+	while(msg.max_distance < 0){
+		printf("\nGentilmente inserisci una distanza maggiore di 0!");
+  	scanf("%lf", &msg.max_distance);
+	}
 
-  //debug
+  // DEBUG:
   //printf("[?] Mando messaggio [%s] a device %d",msg.message,msg.pid_receiver);
 
   // Ottenimento del path della fifo desiderata
