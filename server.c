@@ -4,37 +4,26 @@
 #include "defines.h"
 
 ////////////////////////////////////////////////
-//       			VARIABILI GLOBALI	      			  //
+//       			VARIABILI "GLOBALI"     			  //
 ////////////////////////////////////////////////
 
-// Array di 5 elementi contente i pid dei device
-pid_t child_pid[5];
+pid_t child_pid[5]; //pid dei device
 
-// Matrice delle coordinate dei devices nel tempo
-//int positionMatrix[LIMITE_POSIZIONI][10];
+int semID = 0; // id dell'insieme dei semafori utilizzati
 
-// Contiene l'id dell'insieme dei semafori utilizzati
-int semID = 0;
+int shm_boardId = 0; // Chiave di accesso della board
 
-// Chiave di accesso della board
-int shm_boardId = 0;
+board_t * board; // Puntatore alla struttura board
 
-// Puntatore a prima cella array (-> prima cella tabella)
-board_t * board;
+int shm_ackmsgID = 0; // Chiave accesso alla memoria condivisa ack
 
-// Chiave accesso alla memoria condivisa ack
-int shm_ackmsgID = 0;
-
-// Puntatore a prima cella array (-> lista acknowledge)
-Acknowledgment * ack_list;
+Acknowledgment * ack_list; // Puntatore alla lista ack
 
 char * path2file; //(file posizioni)
 
 ////////////////////////////////////////////////
 //       	 PROTOTIPI FUNZIONI	         			  //
 ////////////////////////////////////////////////
-
-void open_filePosition(char * path2file);  // Vedi -> define.h
 
 void printBoard(board_t * board);
 
@@ -59,14 +48,12 @@ int main(int argc, char * argv[]) {
     printf("Usage: %s msq_key | %s miss file_posizioni.txt path\n", argv[0], argv[1]);
     exit(1);
   }
-  cleanFifoFolder();
 
-  ////////////////////////////////////////////////
-  //       			VARIABILI					      			  //
-  ////////////////////////////////////////////////
+    ///////////////////////////////////////
+   //      			VARIABILI				     	  //
+  ///////////////////////////////////////
 
-  // Puntatore alla stringa che conteine il path del file posizioni
-  path2file = argv[2];
+  path2file = argv[2]; //path del file di input
 
   // Array contente i file descriptor usati per le open delle fifo
   int fd_fifo[5] = {
@@ -77,23 +64,26 @@ int main(int argc, char * argv[]) {
     0
   };
 
-  ////////////////////////////////////////////////
-  //       			INIZIALIZZAZIONE	      			  //
+    ////////////////////////////////////////////////
+   //       			INIZIALIZZAZIONE	      		   //
   ////////////////////////////////////////////////
 
   printf("\n-- Inizializations -- \n");
 
-  // Appertura file posizioni indicato dal path inserito a terminale
-  printf("\n[✓] file_posizioni.txt uploaded:\n");
+  cleanFifoFolder(); //pulisce la cartella fifo se necessario
 
   open_filePosition(path2file);
+  // Appertura file posizioni indicato dal path inserito a terminale
+  printf("\n[✓] file_posizioni.txt loaded\n\n");
 
-  // Stampa delle posizioni lette
-  printPosition();
+  //DEBUG: Stampa delle posizioni lette
+  //printPosition();
 
-  // Creazione e inizializzazione insieme di SEMAFORI
-  semID = semget(IPC_PRIVATE, 7, S_IRUSR | S_IWUSR);
-
+	////
+	// SEMAFORI
+  ////
+	
+  semID = semget(IPC_PRIVATE, 7, S_IRUSR | S_IWUSR); //creazione
   if (semID == -1)
     errExit("[x] <Server> Semaphore creation failed!\n");
   printf("[✓] Semaphore set: created\n");
@@ -104,16 +94,21 @@ int main(int argc, char * argv[]) {
     0, //dev 2
     0, //dev 3
     0, //dev 4
-    1, //board
-    0 //acklist
+    0, //board
+    0  //acklist
   };
 
   union semun arg;
   arg.array = semInitVal;
 
-  if (semctl(semID, 0 /*ignored*/ , SETALL, arg) == -1)
+  if (semctl(semID, 0 , SETALL, arg) == -1) //inizializza
     errExit("[x] <Server> initialization semaphore set failed\n");
   printf("[✓] Semaphore set: initialized\n");
+
+
+	////
+	// MEMORIA CONDIVISA
+  ////
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_boardId = alloc_shared_memory(IPC_PRIVATE, sizeof(board_t));
@@ -121,7 +116,7 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   board = (board_t * ) get_shared_memory(shm_boardId, 0);
 
-  printf("\n[✓] Board: shared memory allocated and initialized\n");
+  printf("[✓] Board: shared memory allocated and initialized\n");
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_ackmsgID = alloc_shared_memory(IPC_PRIVATE, ACK_LIST_SIZE * sizeof(Acknowledgment));
@@ -129,13 +124,13 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   ack_list = (Acknowledgment * ) get_shared_memory(shm_boardId, 0);
 
-  printf("\n[✓] Acklist: sahred memory allocated and initialized");
+  printf("[✓] Acklist: sahred memory allocated and initialized\n\n");
 
-  ////////////////////////////////////////////////
-  //   				CODICE PROGRAMMA								  //
+    ////////////////////////////////////////////////
+   //   				CODICE PROGRAMMA							   //
   ////////////////////////////////////////////////
 
-  printf("\n\n -- Operations -- \n");
+  printf("\n\t\t\t  -- Operations -- \n");
 
   // Ciclo di fork
   for (int child = 0; child < 5; child++) {
@@ -143,10 +138,8 @@ int main(int argc, char * argv[]) {
 
     pid_t pid = fork();
 
-
-
-
     child_pid[child] = pid; //in teoria dovrei avere una copia vuota nei figli e una copia funzionante nel padre. Finché chiamo la roba dal padre tutto ok
+
     if (pid == -1)
       errExit("\n[x] <Server> Devices creation failed");
 
@@ -156,62 +149,50 @@ int main(int argc, char * argv[]) {
 			// Mantiene traccia dell'ultima cella utilizzata dell'array inbox_t
 			int lastposition = 0;
 
-      //printf("[✓] <D%d> I'm alive! My pid is %d.\n",child, getpid());
 
       // Formulazione del path di ogni fifo legata al pid di ogni processo device.
-
       char path2fifo[100];
-
       sprintf(path2fifo, "./fifo/dev_fifo.%d\n", getpid());
 
       // Creazione fifo (col nome appropriato appena trovato.)
-
       if (mkfifo(path2fifo, S_IRUSR | S_IWUSR) == -1)
         errExit("\n[x] A device failed to create the fifo");
       //printf("\n[✓] <D%d> Ho creato la fifo %s", child,path2fifo);
 
       // Gestione del server della lettura e del muovimento 
-      // 2s attesi alla fine del movimento del device D5.
       int fd_fifo = open(path2fifo, O_RDONLY | O_NONBLOCK);
 
       if (fd_fifo == -1)
         errExit("[x] Device Could not open fifo :(");
 
-      //printf("<D%d> Ho aperto la fifo! >:P\n", child);
-
-      int step = 0;
+    	int step = 0;
 
       while (positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI) {
         semOp(semID, child, -1);
 
+          ////////////////////////////////////////////////
+         // 	QUESTA ZONA è MUTUALMENTE ESCLUSIVA!!!!  //
         ////////////////////////////////////////////////
-        // 	QUESTA ZONA è MUTUALMENTE ESCLUSIVA!!!!   //
-        //    printf("[%d] ayy\n\n",child);						//
-        ////////////////////////////////////////////////
 
-        // Il device guarda se qualcuno ha pensato bene di scrivere sulla sua fifo
-				// Struttura del messaggio (defines.h -> message)
-        message msg;
 
-				// Utile alla read
-				ssize_t bR;
+        message msg; //struttura dove salvo un eventuali messaggio
+				ssize_t bR; // serve a leggere
 
-				// DEBUG: mantiene conto del numero di messaggi letti dalla fifo
-				int giro = 0;
+				inbox_t inbox[100];// Inbox dei messaggi (defines.h -> inbox_t)
+				
+				
+				////
+				// LETTURA MESSAGGI
+				////
 
-				// Inbox dei messaggi (defines.h -> inbox_t)
-				inbox_t inbox[100];
-
-				//per ogni messaggio ricevuto:
 				do{
 					bR = read(fd_fifo, &msg, sizeof(msg));
 					if (bR == -1)
 						errExit("[x] Device couldn't read fifo :(");
 
 					if (bR != 0) {
-						// DEBUG: print del messaggio 
-						/*printf("\n\nDevice %d GIRO: %d\n",child, giro);*/
-						printf("\n[+]**** Mi sa che ho letto qualcosa di nuovo\n");			
+						
+						printf("\n[+]**** D%d ha nuovi messaggi!\n",child);			
 
 						// Scrittura del messaggio nell'array inbox alla riga lastposition
 						inbox_t msgarrivo = { 
@@ -225,25 +206,38 @@ int main(int argc, char * argv[]) {
 					}
 				}while(bR != 0);
 
-				// DEBUG: stampa del messaggio nell'array di inbox
+				// DEBUG: STAMPA LA INBOX
+				printf("\n< Inbox D%d >\n",child);
 				for(int i = 0; i < lastposition; i++){
 					if(inbox[i].firstSent == 0)
-						printf("\n< Inbox D%d >\n\tPid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n",child, inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
+						printf("Pid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n", inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
 				}
 
-				//						abbiamo un messaggio	Ho ancora questo messaggio?
+
+				////
+				// LETTURA MESSAGGI
+				////
+
+				//						abbiamo un messaggio? 	Ho ancora questo messaggio?
 				//												|									|
-				//												v									v
-				for(int i = 0; i < lastposition; i++){
-					for(int receiver = 0; receiver < 0 && inbox[i].firstSent==0; receiver++){
+				//												v									|
+				for(int i = 0; i < lastposition; i++){	//  V
+					printf("cow\n");
+					for(int receiver = 0; receiver < 5 && inbox[i].firstSent==0; receiver++){
 						// Condizioni: 1) distanza appropriata 2) non primo step 3) receiver != sender
-						if(distanceCalculator(
-							positionMatrix[step - 1][2 * child], 
-							positionMatrix[step - 1][2 * child+1], 
-							positionMatrix[step - 1][2 * receiver], 
-							positionMatrix[step - 1][2 * receiver+1]) < inbox[i].msg.max_distance && step != 0 && receiver != child){
+					printf("moo\n");
+
+						double dist = distanceCalculator(
+							positionMatrix[step][2 * child], 
+							positionMatrix[step][2 * child+1], 
+							positionMatrix[step][2 * receiver], 
+							positionMatrix[step][2 * receiver+1]);
+
+						printf("[!] Distanza d%d d%d : %.3lf/%.3lf\n",child,receiver,dist,inbox[i].msg.max_distance);
+						if( dist <= inbox[i].msg.max_distance && step != 0 && receiver != child){
 								//mandare il messaggio via fifo :O
 								inbox[i].firstSent = 1;
+								printf("<D%d> Ho consegnato il messaggio a D%d",child,receiver);
 						}
 					}
 				}
@@ -287,50 +281,37 @@ int main(int argc, char * argv[]) {
   for (step = 0; positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI; step++) {
 
     //apri il semaforo del primo device
+    semOp(semID, 0, 1);
+		//qui eseguono i figli
     semOp(semID, 5, -1);
 
-    printf("\n\n===== [✓] Step %d\n", step);
-    printf("\nStep %d: device positions ########################", step);
+    printf("═══════════════ [✓] Step %d  ════════════════════╗\n", step);
+
+    printf("Step %d: device positions ########################", step);
     printf("\nD1 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 0], positionMatrix[step][2 * 0 + 1]);
     printf("\nD2 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 1], positionMatrix[step][2 * 1 + 1]);
     printf("\nD3 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 2], positionMatrix[step][2 * 2 + 1]);
     printf("\nD4 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 3], positionMatrix[step][2 * 3 + 1]);
     printf("\nD5 (%d, %d) \t|\t msgs: list", positionMatrix[step][2 * 4], positionMatrix[step][2 * 4 + 1]);
-    printf("\n\n[✓] Devices are moving.\n");
 
-    clearBoad(board);
+    printBoard(board);
 
-    semOp(semID, 0, 1);
+    printf("════════════════════════════════════════════════╝\n");
+
+		 clearBoad(board);
+
+		for(int i=1;i<=SLEEP_TIME;i++){
+			sleep(1);
+			printf("%d... ",SLEEP_TIME-i);
+			fflush(stdout);
+			}
 
     // Inizio timer (2s) di attesa post-muovimento
 		// Sleep di n secondi (delta tempo tra muovimento ultimo device e ripresa operazioni)
-		sleep(SLEEP_TIME);
+	printf("\n");
 
-    printBoard(board);
-    /*
-    		//--> apre la fifo se lo step è 0 (ovvero all'inizio)
-    		if (step == 0){
 
-    			// Ciclo di appertura in scrittura delle fifo da parte dei device i-esimo
-    			for(int i = 0; i < 5; i++){
 
-    				// Formulazione del path di ogni fifo legata al pid di ogni processo device.
-    				char path2fifo[100];
-
-    				sprintf(path2fifo, "./fifo/dev_fifo.%d\n", child_pid[i]);
-    				printf("[?] Sto aprendo la fifo %s", path2fifo);
-
-    				// Appertura della fifo in non_block mode quando è in read only
-    				
-
-    				//se la fifo non c'è, amen
-    				fd_fifo[i] = open(path2fifo, O_RDONLY | O_NONBLOCK);
-    				
-
-    			}
-    		}*/
-
-    printf("\n===== [✓] Step %d's ending\n", step);
   }
 
   // Prima di procedere con la chiusura attende la terminazione dei device.
@@ -399,25 +380,24 @@ void printBoard(board_t * board) {
     for (int j = 0; j < 10; j++) {
       pid = board -> board[i][j];
       if (pid == child_pid[0])
-        c = '1';
+        c = '0';
       else if (pid == child_pid[1])
-        c = '2';
+        c = '1';
       else if (pid == child_pid[2])
-        c = '3';
+        c = '2';
       else if (pid == child_pid[3])
-        c = '4';
+        c = '3';
       else if (pid == child_pid[4])
-        c = '5';
+        c = '4';
       else
         c = ' ';
       printf("|%c ", c);
-
-      //printf("|%d",board->board[i][j]);
+			
     }
-    printf("\n");
+    printf("|\n");
   }
 
-  printf("\t----------------------------\n");
+  printf("\t--------------------------------\n");
 }
 
 /*
@@ -441,7 +421,6 @@ void printPosition() {
 
 /*
 Elimina tutti i file contenti nella cartella './fifo'
-Serve a migliorare la leggibilità del codice.
 */
 int cleanFifoFolder() {
 
