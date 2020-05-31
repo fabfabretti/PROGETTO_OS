@@ -3,8 +3,12 @@
 ///         specifiche per la gestione della MEMORIA CONDIVISA.
 
 #pragma once
-//TODO
-#include <stdlib.h>
+
+
+#include "defines.h"
+
+#include <stddef.h>
+#include <sys/types.h>
 
 // The alloc_shared_memory method creates, if it does not exist, a shared
 // memory segment with size bytes and shmKey key.

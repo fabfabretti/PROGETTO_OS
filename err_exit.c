@@ -1,15 +1,9 @@
 /// @file err_exit.c
 /// @brief Contiene l'implementazione della funzione di stampa degli errori.
 
-#include "err_exit.h"
+#include "defines.h"
 
-#include <stdlib.h>
 
-#include <stdarg.h>
-
-#include <stdio.h>
-
-#include <errno.h>
 
 void errExit(const char * msg) {
   perror(msg);

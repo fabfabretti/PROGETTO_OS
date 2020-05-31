@@ -2,17 +2,7 @@
 /// @brief Contiene l'implementazione delle funzioni
 ///         specifiche per la gestione dei SEMAFORI.
 
-#include "err_exit.h"
-
-#include "semaphore.h"
-
-#include <sys/sem.h>
-
-#include <errno.h>
-
-#include "semaphore.h"
-
-#include <stdio.h>
+#include "defines.h"
 
 // Sostituisce la system call semop rendendola più agibile eliminando la necessità dei flag
 void semOp(int semid, unsigned short sem_num, short sem_op) {
