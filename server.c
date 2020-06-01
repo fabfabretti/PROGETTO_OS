@@ -7,7 +7,7 @@
 //       			VARIABILI "GLOBALI"     			  //
 ////////////////////////////////////////////////
 
-pid_t child_pid[5]; //pid dei device
+pid_t * child_pid; // pid dei device
 
 int semID = 0; // id dell'insieme dei semafori utilizzati
 
@@ -37,6 +37,8 @@ void sigHandler(int sig);
 
 void close_all();
 
+char * pathBuilder (pid_t pid_receiver);
+
 ////////////////////////////////////////////////
 //     				  	 MAIN				         			  //
 ////////////////////////////////////////////////
@@ -63,6 +65,9 @@ int main(int argc, char * argv[]) {
     0,
     0
   };
+
+	//Contiene l'ID della memoria condivisa contente l'array di pid dei device
+	int shm_pidArrayID = 0;
 
     ////////////////////////////////////////////////
    //       			INIZIALIZZAZIONE	      		   //
@@ -105,10 +110,11 @@ int main(int argc, char * argv[]) {
     errExit("[x] <Server> initialization semaphore set failed\n");
   printf("[✓] Semaphore set: initialized\n");
 
-
 	////
 	// MEMORIA CONDIVISA
   ////
+
+	// BOARD
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_boardId = alloc_shared_memory(IPC_PRIVATE, sizeof(board_t));
@@ -118,6 +124,8 @@ int main(int argc, char * argv[]) {
 
   printf("[✓] Board: shared memory allocated and initialized\n");
 
+	//ACKLIST
+
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_ackmsgID = alloc_shared_memory(IPC_PRIVATE, ACK_LIST_SIZE * sizeof(Acknowledgment));
 
@@ -125,6 +133,16 @@ int main(int argc, char * argv[]) {
   ack_list = (Acknowledgment * ) get_shared_memory(shm_boardId, 0);
 
   printf("[✓] Acklist: sahred memory allocated and initialized\n\n");
+
+	// ARRAY PID
+
+  // Crea il segmento di memoria condivisa da qualche parte nella memoria.
+  shm_pidArrayID = alloc_shared_memory(IPC_PRIVATE, 5 * sizeof(pid_t));
+
+  // Attachnment segmento shared memory della board
+  child_pid = (pid_t *) get_shared_memory(shm_pidArrayID, 0);
+
+  printf("[✓] Pid array: sahred memory allocated and initialized\n\n");
 
     ////////////////////////////////////////////////
    //   				CODICE PROGRAMMA							   //
@@ -138,19 +156,25 @@ int main(int argc, char * argv[]) {
 
     pid_t pid = fork();
 
-    child_pid[child] = pid; //in teoria dovrei avere una copia vuota nei figli e una copia funzionante nel padre. Finché chiamo la roba dal padre tutto ok
-
     if (pid == -1)
       errExit("\n[x] <Server> Devices creation failed");
 
     // CODICE ESEGUITO DAL i-ESIMO FIGLIO
     if (pid == 0) {
 
+			//Scriviamo il pid dentro l'array condiviso dei pid :)
+			
+			child_pid[child] = getpid(); // No semafori perché ognuno scrive nella sua posizione (ergo non si possono incrociare, hopefully)
+			
+			//DEBUG: stampa array pid
+			//printf("\nChild_pid[%d]: %d", child, child_pid[child]);
+
 			// Mantiene traccia dell'ultima cella utilizzata dell'array inbox_t
 			int lastposition = 0;
 
 
       // Formulazione del path di ogni fifo legata al pid di ogni processo device.
+			
       char path2fifo[100];
       sprintf(path2fifo, "./fifo/dev_fifo.%d\n", getpid());
 
@@ -192,7 +216,7 @@ int main(int argc, char * argv[]) {
 
 					if (bR != 0) {
 						
-						printf("\n[+]**** D%d ha nuovi messaggi!\n",child);			
+						printf("\n[+] **** D%d ha nuovi messaggi!\n",child);			
 
 						// Scrittura del messaggio nell'array inbox alla riga lastposition
 						inbox_t msgarrivo = { 
@@ -206,38 +230,74 @@ int main(int argc, char * argv[]) {
 					}
 				}while(bR != 0);
 
-				// DEBUG: STAMPA LA INBOX
+				// DEBUG: stampa della inbox
 				printf("\n< Inbox D%d >\n",child);
 				for(int i = 0; i < lastposition; i++){
 					if(inbox[i].firstSent == 0)
-						printf("Pid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n", inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
+						printf("\nPid Ricevitore %d\n\tPid mandante %d\n\tDistanza %lf\n\tMessage id %d\n\tMessaggio:%s\tSent? %d\n\n", inbox[i].msg.pid_receiver, inbox[i].msg.pid_sender, inbox[i].msg.max_distance, inbox[i].msg.message_id, inbox[i].msg.message, inbox[i].firstSent);
 				}
 
 
 				////
-				// LETTURA MESSAGGI
+				// SCRITTURA MESSAGGI
 				////
 
 				//						abbiamo un messaggio? 	Ho ancora questo messaggio?
 				//												|									|
 				//												v									|
 				for(int i = 0; i < lastposition; i++){	//  V
-					printf("cow\n");
+					
+					//DEBUG: stringa segnalazione
+					//printf("cow\n");
+
 					for(int receiver = 0; receiver < 5 && inbox[i].firstSent==0; receiver++){
-						// Condizioni: 1) distanza appropriata 2) non primo step 3) receiver != sender
-					printf("moo\n");
+						
+						//DEBUG: stringa segnalazione
+						//printf("moo\n");
 
 						double dist = distanceCalculator(
-							positionMatrix[step][2 * child], 
-							positionMatrix[step][2 * child+1], 
-							positionMatrix[step][2 * receiver], 
-							positionMatrix[step][2 * receiver+1]);
+							positionMatrix[step][2 * child], 				// x 1
+							positionMatrix[step][2 * child + 1], 		// y 1
+							positionMatrix[step][2 * receiver], 		// x 2
+							positionMatrix[step][2 * receiver + 1]);// y 2
 
-						printf("[!] Distanza d%d d%d : %.3lf/%.3lf\n",child,receiver,dist,inbox[i].msg.max_distance);
-						if( dist <= inbox[i].msg.max_distance && step != 0 && receiver != child){
+						//DEBUG:
+						printf("[!] Distanza D%d - D%d: %.3lf/%.3lf\n", child, receiver, dist, inbox[i].msg.max_distance);
+						
+						// Se accede al codice dell'if inserisce l'ack nella lista (TODO: se il dispositivo ha già ricevuto o meno il messaggio)
+						// Condizioni: 1) distanza appropriata 2) non primo step 3) receiver != sender
+						if(dist <= inbox[i].msg.max_distance && step != 0 && receiver != child){
 								//mandare il messaggio via fifo :O
+
+								pid_t pid_receiver = child_pid[receiver];
+
+								char path2fifoWR[100];
+      					sprintf(path2fifoWR, "./fifo/dev_fifo.%d\n", pid_receiver);
+
+								// DEBUG: stampa percorso costruito
+								printf("[?] Sending to fifo: %s", path2fifoWR);
+
+								//DEBUG: stampa del destinatario
+								printf("[?] Sending to %d\n", pid_receiver);
+
+								// Appertura della fifo del ricevente
+
+								int fd_write = open(path2fifoWR, O_WRONLY);
+								if(fd_write == -1)
+									errExit("[x] device can't open the receiver device fifo");
+
+								// Scrittura del messaggio nella fifo del device ricevente 
+								if(write(fd_write, &inbox[i].msg, sizeof(inbox[i].msg)) == -1)
+										errExit("[x] Device couldn't send message to another device");
+								
+								// Chiusura del file descriptor
+								close(fd_write);
+
 								inbox[i].firstSent = 1;
-								printf("<D%d> Ho consegnato il messaggio a D%d",child,receiver);
+
+
+								//DEBUG: stampa di conferma invio
+								printf("<D%d> Ho consegnato il messaggio a <D%d>", child, receiver);
 						}
 					}
 				}
@@ -263,9 +323,10 @@ int main(int argc, char * argv[]) {
 
       exit(0);
     }
+
+
   }
 
-  // qui i figli sono vivi
 
   ////////////////////////////////////////////////
   //   				GESTIONE DEGLI STEP								//
@@ -273,7 +334,7 @@ int main(int argc, char * argv[]) {
 
   clearBoad(board);
 
-  //APERTURA fifo in scrittura (ondevitare blocco dei child finché non arriva il client)
+  // APERTURA fifo in scrittura (ondevitare blocco dei child finché non arriva il client)
 
   // Ciclo di spostamento dei device
   int step;
@@ -282,6 +343,7 @@ int main(int argc, char * argv[]) {
 
     //apri il semaforo del primo device
     semOp(semID, 0, 1);
+
 		//qui eseguono i figli
     semOp(semID, 5, -1);
 
@@ -298,20 +360,18 @@ int main(int argc, char * argv[]) {
 
     printf("════════════════════════════════════════════════╝\n");
 
-		 clearBoad(board);
+		clearBoad(board);
 
+		//DEVUD: timer di countdown per ricezione messaggi
 		for(int i=1;i<=SLEEP_TIME;i++){
 			sleep(1);
 			printf("%d... ",SLEEP_TIME-i);
 			fflush(stdout);
-			}
+		}
 
     // Inizio timer (2s) di attesa post-muovimento
 		// Sleep di n secondi (delta tempo tra muovimento ultimo device e ripresa operazioni)
-	printf("\n");
-
-
-
+		printf("\n");
   }
 
   // Prima di procedere con la chiusura attende la terminazione dei device.
@@ -492,4 +552,17 @@ void sigHandler(int sig) {
     printf("\n\nThe signal SIGTERM was caught.\n");
     close_all();
   }
+}
+
+/*
+Costruttore del path per le fifo
+*/
+char * pathBuilder (pid_t pid_receiver){
+
+	// Formulazione del path di ogni fifo legata al pid di ogni processo device.
+	char *path2fifo;
+	
+	sprintf(path2fifo, "./fifo/dev_fifo.%d", pid_receiver);
+
+	return path2fifo;
 }
