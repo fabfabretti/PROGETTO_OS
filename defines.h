@@ -71,7 +71,7 @@ typedef struct {
   pid_t pid_receiver;
   int message_id;
   time_t timestamp;
-} Acknowledgment;
+} Acknowledgement;
 
 /* 
 Tale struttura serve per mantenere in memoria i messaggi inseriti nella fifo.

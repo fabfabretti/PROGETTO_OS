@@ -2,30 +2,7 @@
 /// @brief Contiene l'implementazione del client.
 
 #include "defines.h"
-
-
-/*
-
- Il client poi resta in attesa del messaggio contenente gli acknowledgment dalla
-coda di messaggi. 
-
-Ricevuto il messaggio il client salva su file la lista di acknowledgment e termina.
-
-
-Infine si termina il server, ack_manager e devices inviando un segnale SIGTERM al processo server
-il quale gestisce la chiusura dei processi figlio e la rimozione/chiusura dei meccanismi di
-comunicazione tra processi (i.e., fifo, memoria condivisa, code messaggi, semafori, etc).
-
-- aprire la relativa fifo in scrittura
-
-- inviare il messaggio e poi attendere dalla coda di messaggi la relativa lista di acknowledgment. 
-
-- Una volta ricevuta, deve stamparla su file e terminare.
-
-• Moltepici client possono essere eseguiti in modo concorrente per inviare più messaggi (con
-diverso id) a più device.
-• Il message_id passato dall’utente al client deve essere univoco
-*/
+#include "err_exit.c"
 
 ////////////////////////////////////////////////
 //       			VARIABILI GLOBALI	      			  //
@@ -69,8 +46,12 @@ int main(int argc, char * argv[]) {
   scanf("%d", &msg.pid_receiver);
 
   // Assegnazione ID MESSAGGIO
-  printf("[+] Inserire id messaggio:");
+  printf("[+] Insert the ID of the messasge (must be > 0): ");
   scanf("%d", &msg.message_id);
+	while(msg.max_distance < 0){
+		printf("\nPleas, insert a value higher than 0.");
+  	scanf("%d", &msg.message_id);
+	}
 
   // Assegnazione MESSAGGIO
   printf("[+] Insert the message to send: ");
@@ -84,7 +65,7 @@ int main(int argc, char * argv[]) {
   scanf("%lf", &msg.max_distance);
 	
 	while(msg.max_distance < 0){
-		printf("\nGentilmente inserisci una distanza maggiore di 0!");
+		printf("\nPleas, insert a value higher than 0.");
   	scanf("%lf", &msg.max_distance);
 	}
 
@@ -100,11 +81,13 @@ int main(int argc, char * argv[]) {
 
   // Appertura della fifo
   int fd = open(path2fifo, O_WRONLY);
+	if(fd == -1)
+		errExit("Client can't open the fifo");
 
   // Scrittura del messaggio nella fifo
   write(fd, &msg, sizeof(msg));
 
-  printf("[✓] Message [hopefully] sent to device %d\n", msg.pid_receiver);
+  printf("[✓] Message sent to device <%d>\n", msg.pid_receiver);
 
   // Chiusura fifo
   close(fd);
