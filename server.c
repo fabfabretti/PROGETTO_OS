@@ -78,6 +78,8 @@ void clearBoad(board_t * board);
 
 int cleanFifoFolder();
 
+typedef void (*sighandler_t)(int);
+
 void sigHandler(int sig);
 
 void close_all();
@@ -130,6 +132,8 @@ int main(int argc, char * argv[]) {
   // - - - - - - - - - - - - - - - 
 
   printf("\n-- Inizializations -- \n");
+
+	printf("[!!!!] I'm Father. My pid is %d,should u kill me\n",getpid());
 
 
   // FIFO
@@ -220,6 +224,27 @@ int main(int argc, char * argv[]) {
   printf("[✓] Message queue ID: sahred memory allocated and initialized\n\n");
 
 
+  // SIGHANDLER
+  // - - - - - - - - - - - - - - - 
+
+	// Set contenente un insieme di segnali
+	sigset_t mySet;
+
+	// Inizializziamo mySet affinché contenga tutti i segnali eccetto SIGTERM
+	sigfillset(&mySet);
+	sigdelset(&mySet, SIGTERM);
+	
+	//DA COMMENTARE
+	sigdelset(&mySet, SIGINT);
+	sigprocmask(SIG_SETMASK, &mySet, NULL);
+
+	if(signal(SIGTERM, sigHandler) == SIG_ERR)
+		errExit("[x] Failed to set sigHandler");
+
+	//DA COMMENTARE
+	if(signal(SIGINT, sigHandler) == SIG_ERR)
+		errExit("[x] Failed to set sigHandler");
+	
   // - - - - - - - - - - - - - - - 
   // CODICE ESEGUITO DAL SERVER 
   // - - - - - - - - - - - - - - - 
@@ -254,6 +279,15 @@ int main(int argc, char * argv[]) {
 
 			// Mantiene traccia dei cicli eseguiti dal sistema
       int step = 0;
+
+			// RESET SIGHANDLER
+		  // - - - - - - - - - - - - - - - 
+
+			//COMMENTARE:
+			if(signal(SIGINT, SIG_DFL) ==SIG_ERR)
+			errExit("[x] Couldn't reset sighandler!!");
+			if(signal(SIGTERM, SIG_DFL) ==SIG_ERR)
+			errExit("[x] Couldn't reset sighandler!!");
 
 			// FIFO
 			// - - - - - - - - - - - - - - - 
@@ -298,7 +332,6 @@ int main(int argc, char * argv[]) {
         // RICEZIONE MESSAGGI, INBOX e ACK
         // - - - - - - - - - - - - - - - 
         do {
-
 					/*
 					Lettura della fifo in ricerca di messaggi e check
 					*/
@@ -399,6 +432,14 @@ int main(int argc, char * argv[]) {
 						Se 0: il messaggio è già stato ricevuto
 						*/
 						int flag2 = first_last_sender_check(tmp_messageID, inbox[i].msg.pid_sender);
+
+						// Se flag2 == 0 il device è l'ultimo dei 5 ad aver ricevuto il messaggio -> deve toglierlo dalla priopria coda.
+						if(flag2 == 0){
+							//DEBUG: stampa conferma cancellazione ultimo messaggio da device
+							printf("\nThe message from the last device is removed\n");
+							inbox[i].firstSent = 1;
+						}
+
 						/* 
 						Se accede al codice dell'if inserisce l'ack nella lista. Condizioni: 
 						 1) distanza appropriata 
@@ -406,15 +447,6 @@ int main(int argc, char * argv[]) {
 						 3) receiver != sender 
 						 4) flag di ricezione da acklist
 						*/
-
-						// Se flag2 == 0 il device è l'ultimo dei 5 ad aver ricevuto il messaggio -> deve toglierlo dalla priopria coda.
-						if(flag2 == 0){
-							//DEBUG: stampa conferma cancellazione ultimo messaggio da device
-							printf("\n\The message from the last device is removed\n");
-							inbox[i].firstSent = 1;
-						}
-
-						
             if (dist <= inbox[i].msg.max_distance && step != 0 && receiver != child && flag1 == 1 && flag2 == 1) {	
               // Invio del messaggio via fifo
               pid_t pid_receiver = child_pid[receiver];
@@ -507,8 +539,18 @@ int main(int argc, char * argv[]) {
 
   if (ack_manager == 0) {
 
+		// RESET SIGHANDLER
+		// - - - - - - - - - - - - - - - 
+
+		//COMMENTARE:
+		if(signal(SIGINT, SIG_DFL) ==SIG_ERR)
+		errExit("[x] Couldn't reset sighandler!!");
+		if(signal(SIGTERM, SIG_DFL) ==SIG_ERR)
+		errExit("[x] Couldn't reset sighandler!!");
+
+
 		// Creazione con check della msg queue mediante key passata come parametro (server)
-		*msgqueueID = msgget(atoi(argv[1]), IPC_CREAT | IPC_EXCL);
+		*msgqueueID = msgget(atoi(argv[1]), S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
 		if(*msgqueueID == -1)
 		  errExit("[x] Message queue creation failed! ");
 		printf("\n[✓] Message queue: created. :D\n");
@@ -526,6 +568,30 @@ int main(int argc, char * argv[]) {
 				// Controlla se ci sono 5 ack con medesimo ID
 				if (ack_list[i].message_id != 0 && ack_list_checker(ack_list[i].message_id, position2free)){
           
+					// MSG QUEUE e ACK
+					// - - - - - - - - - - - - - - - 
+
+					// Preparazione messaggio da inviare
+					ack_msgq mex;
+
+					//mtype acquisisce il valore del message id
+					mex.mtype = ack_list[position2free[0]].message_id;
+					
+					printf("\n[!!!!] Array msgqueue creato per il messaggio con id %d\n",ack_list[position2free[0]].message_id);
+					for(int j = 0; j < 5; j++){
+						mex.ack_msgq_array[j] = ack_list[position2free[j]];
+						printf("%d   ",ack_list[position2free[j]].pid_sender);
+					}
+					printf("\n");
+
+
+					// Invio del messaggio con check sulla msg queue
+					if(msgsnd(*msgqueueID, &mex, sizeof(mex) - sizeof(long), IPC_NOWAIT) == -1)
+						errExit("[x] Error in messagequeue");
+
+					// PULIZIA ACK_LIST
+					// - - - - - - - - - - - - - - - 
+
 					// Imposta a 0 il messagge ID dato nella ack_list
 					clean_ack_list(position2free);
 					
@@ -599,8 +665,6 @@ int main(int argc, char * argv[]) {
 
   // Funzione di terminazione, chiude tutto 
   close_all();
-
-  printf("\n\n[✓] THE END! :D\n\n");
 }
 
 //////////////////////////////////////////
@@ -715,7 +779,8 @@ Terminazione di tutte le strutture dati utilizzate.
 */
 void close_all() {
 	//Detach e delete shared memory MSGID
-  free_shared_memory(msgqueueID);
+	msgctl(*msgqueueID, IPC_RMID, NULL);
+	free_shared_memory(msgqueueID);
   remove_shared_memory(msgqueueKEY);
   printf("\n[✓] Message queue ID: deattached and removed\n");
 
@@ -741,16 +806,11 @@ void close_all() {
 
   if (cleanFifoFolder() != 0)
     errExit("\n[x] Fifo folder not cleaned ./fifo");
+
+	printf("\n\n[✓] THE END! :D\n\n");
 }
 
-void sigHandler(int sig) {
-  printf("\n\nThe sighandler was started.\n");
 
-  if (sig == SIGTERM) {
-    printf("\n\nThe signal SIGTERM was caught.\n");
-    close_all();
-  }
-}
 
 /*
 Costruttore del path per le fifo
@@ -814,8 +874,6 @@ int check_receive_acklist(int tmp_messageID, pid_t child_pid){
 }
 
 /*
-
-
 Controlla se il device che possiede il messaggio con dato message_id è il primo a ricevere tale messaggio (da un client) oppure se è l'ultimo ad averlo ricevuto.
 
 Il controllo si basa su sender del messaggio (se diverso da pid di device -> client).
@@ -863,4 +921,18 @@ int first_last_sender_check(int tmp_messageID, int pid_sender){
 		}
 	return 1;
 	}	
+}
+
+/*
+La funzione impedisce a qualunque segnale (eccetto SIGTERM) di terminare il flusso di esecuzione.
+
+Alla ricezione di un SIGTERM eseguirà la funzione di chiusura.
+*/
+void sigHandler(int sig) {
+  printf("\n\nTime to die!.\n");
+
+	printf("The signal SIGTERM was caught.\n");
+	close_all();
+  
+	exit(0);
 }

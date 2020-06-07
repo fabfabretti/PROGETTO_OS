@@ -85,6 +85,12 @@ typedef struct {
 	int firstSent;
 } inbox_t;
 
+typedef struct{
+	long mtype;
+
+	Acknowledgement ack_msgq_array[5];
+} ack_msgq;
+
 // Funzioni
 double distanceCalculator(int x1, int y1, int x2, int y2);
 void open_filePosition(char * path2file);
