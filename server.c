@@ -7,28 +7,64 @@
 //       			VARIABILI "GLOBALI"     			  //
 ////////////////////////////////////////////////
 
-pid_t * child_pid; // pid dei device
-
-pid_t ack_manager; // pid ack manager
-
-int semID = 0; // id dell'insieme dei semafori utilizzati
-
-int shm_boardID = 0; // Chiave di accesso della board
-
-int * msgqueueID; // ID memoria condivisa message queue 
-
-board_t * board; // Puntatore alla struttura board
-
-int shm_ackmsgID = 0; // Chiave accesso alla memoria condivisa ack
-
-Acknowledgement * ack_list; // Puntatore alla lista ack
-
-char * path2file; //(file posizioni)
-
-int msgqueueKEY; // Chiave delle message queue
+// DEVICES
+// - - - - - - - - - - - - - - - 
 
 // Contiene l'ID della memoria condivisa contente l'array di pid dei device
 int shm_pidArrayID = 0;
+
+// Contiene il pid dei 5 devices
+pid_t * child_pid; 
+
+
+// ACK MANAGER
+// - - - - - - - - - - - - - - - 
+
+// Contiene il pid dell'ack manager
+pid_t ack_manager; 
+
+
+// ACK LIST
+// - - - - - - - - - - - - - - - 
+ 
+// Contiene l'ID della memoria condivisa contente l'ack list
+int shm_ackmsgID = 0;
+
+// Puntatore alla ack_list
+Acknowledgement * ack_list; 
+
+
+// SEMAFORI
+// - - - - - - - - - - - - - - - 
+
+// Contiene l'ID dell'insieme di semafori
+int semID = 0; 
+
+
+// BOARD
+// - - - - - - - - - - - - - - - 
+
+// Contiene la chiave di accesso della BOARD
+int shm_boardID = 0; 
+
+// Puntatore alla struttura board
+board_t * board; 
+
+
+// MESSAGE QUEUE
+// - - - - - - - - - - - - - - - 
+
+// Contiene l'ID memoria condivisa MESSAGE QUEUE
+int * msgqueueID; 
+
+// Contiene la chiave della message queue
+int msgqueueKEY; 
+
+
+
+// Puntatore all'array contente il path del file posizioni
+char * path2file; 
+
 
 ////////////////////////////////////////////////
 //       	 PROTOTIPI FUNZIONI	         			  //
@@ -54,7 +90,7 @@ void clean_ack_list(int * position2free);
 
 int check_receive_acklist(int tmp_messageID, pid_t child_pid);
 
-
+int first_last_sender_check(int tmp_messageID, int pid_sender);
 
 ////////////////////////////////////////////////
 //     				  	 MAIN				         			  //
@@ -68,9 +104,10 @@ int main(int argc, char * argv[]) {
     exit(1);
   }
 
-  ///////////////////////////////////////
-  //      			VARIABILI				     	  //
-  ///////////////////////////////////////
+  // - - - - - - - - - - - - - - - 
+  //      			VARIABILI
+  // - - - - - - - - - - - - - - - 
+
 
   // Path contente il file posizioni
   path2file = argv[2];
@@ -87,15 +124,16 @@ int main(int argc, char * argv[]) {
   // Contiene la posizione degli ack da togliere (vedi -> ack_list)
   int position2free[5];
 
-  ////////////////////////////////////////////////
-  //       			INIZIALIZZAZIONE	      		   //
-  ////////////////////////////////////////////////
+
+  // - - - - - - - - - - - - - - - 
+  //       			INIZIALIZZAZIONE
+  // - - - - - - - - - - - - - - - 
 
   printf("\n-- Inizializations -- \n");
 
-  ////
+
   // FIFO
-  ////
+  // - - - - - - - - - - - - - - - 
 
   // Cancellazione file all'interno della cartella fifo
   cleanFifoFolder();
@@ -107,9 +145,9 @@ int main(int argc, char * argv[]) {
   //DEBUG: Stampa delle posizioni lette
   //printPosition();
 
-  ////
+
   // SEMAFORI
-  ////
+  // - - - - - - - - - - - - - - - 
 
   // Creazione del set di semafori
   semID = semget(IPC_PRIVATE, 7, S_IRUSR | S_IWUSR);
@@ -117,29 +155,31 @@ int main(int argc, char * argv[]) {
     errExit("[x] <Server> Semaphore creation failed!\n");
   printf("[✓] Semaphore set: created\n");
 
-  unsigned short semInitVal[] = {
+	// Array contente il valore iniziale dei semafori
+	unsigned short semInitVal[] = {
     0, // 0 - dev 0
     0, // 1 - dev 1
     0, // 2 - dev 2
     0, // 3 - dev 3
     0, // 4 - dev 4
     0, // 5 - board
-    1 // 6 - acklist
+    1  // 6 - acklist
   };
 
   union semun arg;
+
   arg.array = semInitVal;
 
-  // Inizializzazione 
+  // Inizializzazione set semafori
   if (semctl(semID, 0, SETALL, arg) == -1)
     errExit("[x] <Server> initialization semaphore set failed\n");
   printf("[✓] Semaphore set: initialized\n\n");
 
-  ////
-  // MEMORIA CONDIVISA
-  ////
 
-  // BOARD
+  // SHARED MEMORY
+  // - - - - - - - - - - - - - - - 
+
+  // - - BOARD - -
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_boardID = alloc_shared_memory(IPC_PRIVATE, sizeof(board_t));
@@ -149,7 +189,7 @@ int main(int argc, char * argv[]) {
 
   printf("[✓] Board: shared memory allocated and initialized\n\n");
 
-  //ACKLIST
+  // - - ACKLIST - -
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_ackmsgID = alloc_shared_memory(IPC_PRIVATE, ACK_LIST_SIZE * sizeof(Acknowledgement));
@@ -159,7 +199,7 @@ int main(int argc, char * argv[]) {
 
   printf("[✓] Acklist: sahred memory allocated and initialized\n\n");
 
-  // ARRAY PID
+  // - - ARRAY PID - -
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_pidArrayID = alloc_shared_memory(IPC_PRIVATE, 5 * sizeof(pid_t));
@@ -169,7 +209,7 @@ int main(int argc, char * argv[]) {
 
   printf("[✓] Pid array: sahred memory allocated and initialized\n\n");
 
-	// MSG QUEUE
+	// - - MSG QUEUE - - 
 
 	// Crea il segmento di memoria condivisa da qualche parte nella memoria.
   msgqueueKEY = alloc_shared_memory(IPC_PRIVATE, sizeof(int));
@@ -180,15 +220,15 @@ int main(int argc, char * argv[]) {
   printf("[✓] Message queue ID: sahred memory allocated and initialized\n\n");
 
 
-  ////////////////////////////////////////////////
-  //   				CODICE PROGRAMMA							   //
-  ////////////////////////////////////////////////
+  // - - - - - - - - - - - - - - - 
+  // CODICE ESEGUITO DAL SERVER 
+  // - - - - - - - - - - - - - - - 
 
   printf("\n\t\t\t  -- Operations -- \n");
 
-  ////
-  // DEVICE
-  ////
+  // - - - - - - - - - - - - - - - 
+  // CREAZIONE E CODICE DEVICES 
+  // - - - - - - - - - - - - - - - 
   for (int child = 0; child < 5; child++) {
 
     pid_t pid = fork();
@@ -196,40 +236,56 @@ int main(int argc, char * argv[]) {
     if (pid == -1)
       errExit("\n[x] <Server> Devices creation failed");
 
-    // CODICE ESEGUITO DAL i-ESIMO FIGLIO
+		// CODICE I-ESIMO FIGLIO
+		// - - - - - - - - - - - - - - - 
     if (pid == 0) {
+
+			// VARIABILI DEL DEVICE
+			// - - - - - - - - - - - - - - - 
 
       // Contiene il pid dei device nelle rispettive posizioni
       child_pid[child] = getpid();
 
       // Mantiene traccia dell'ultima cella utilizzata dell'array inbox_t
       int lastposition = 0;
+			
+			// Array contente il path per creare le fifo
+			char path2fifo[100];
+
+			// Mantiene traccia dei cicli eseguiti dal sistema
+      int step = 0;
+
+			// FIFO
+			// - - - - - - - - - - - - - - - 
 
       // Formulazione del path di ogni fifo legata al pid di ogni processo device.
-      char path2fifo[100];
       sprintf(path2fifo, "./fifo/dev_fifo.%d\n", getpid());
 
       // Creazione fifo (col nome appropriato appena trovato.)
       if (mkfifo(path2fifo, S_IRUSR | S_IWUSR) == -1)
         errExit("\n[x] A device failed to create the fifo");
 
-      // Gestione del server della lettura e del muovimento 
+      // Appertura della fifo 
       int fd_fifo = open(path2fifo, O_RDONLY | O_NONBLOCK);
-
       if (fd_fifo == -1)
         errExit("[x] Device Could not open fifo :(");
 
-      // Mantiene traccia dei cicli eseguiti dal sistema
-      int step = 0;
 
+			// MESSAGGI, INBOX, LETTURA, CREAZIONE E GESTIONE ACK, MOVIMENTO
+			// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       while (positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI) {
+				
+				// - - - - - - - - - - - - - - - //
+        // 	ZONA MUTUALMENTE ESCLUSIVA	 //
+				// - - - - - - - - - - - - - - - //
 
+				// Chiusura i-esimo semaforo
         semOp(semID, child, -1);
-        ////////////////////////////////////////////////
-        // 	QUESTA ZONA è MUTUALMENTE ESCLUSIVA!!!!  //
-        ////////////////////////////////////////////////
 
-        // Conteine un messaggio
+				// VARIABILI
+				// - - - - - - - - - - - - - - - 
+
+        // Contenitore di un singolo messaggio
         message msg;
 
         // Utile alle read
@@ -238,17 +294,20 @@ int main(int argc, char * argv[]) {
         // Inbox dei messaggi (defines.h -> inbox_t)
         inbox_t inbox[100];
 
-        ////
-        // MESSAGGI e INBOX
-        ////
 
+        // RICEZIONE MESSAGGI, INBOX e ACK
+        // - - - - - - - - - - - - - - - 
         do {
+
+					/*
+					Lettura della fifo in ricerca di messaggi e check
+					*/
           bR = read(fd_fifo, & msg, sizeof(msg));
           if (bR == -1)
             errExit("[x] Device couldn't read fifo :(");
 
           if (bR != 0) {
-
+						//DEBUG: notifica nuovo messaggio
             printf("\n[+] **** <D%d> has new message!\n", child);
 
             // Scrittura del messaggio in inbox[lastposition]
@@ -261,7 +320,10 @@ int main(int argc, char * argv[]) {
 
             lastposition++;
 
-            // Inserimento dell'ack in ack_list
+            // ACK e ACK LIST
+						// - - - - - - - - - - - - - - - 
+
+						// Creazione ack
             Acknowledgement ack = {
               .pid_sender = msg.pid_sender,
               .pid_receiver = getpid(),
@@ -272,16 +334,15 @@ int main(int argc, char * argv[]) {
             //DEBUG: stampa della board di debug
             //printBoard(board);
 
-            // Ciclo utile a scorrere l'ack_list finchè non trova cella libera (message_id == 0)
             int z = 0;
 
-            // Chiudura semaforo
+            // Chiusura semaforo dell'ack list
             semOp(semID, 6, -1);
 
+            // Ciclo utile a scorrere l'ack_list finchè non trova cella libera (message_id == 0)
             while (ack_list[z].message_id != 0) {
               if (z == ACK_LIST_SIZE)
                 errExit("The ack_list is full.");
-
               z++;
             }
 
@@ -289,29 +350,31 @@ int main(int argc, char * argv[]) {
             ack_list[z] = ack;
 
             //DEBUG: stampa ack
-            printf("\nACK\n\tSender: %d \n\tReceiver: %d\n\tMessage_id: %d\n\tTime: ", ack.pid_sender, ack.pid_receiver, ack.message_id);
-            printf("%s\n", asctime(localtime( & ack.timestamp)));
+            printf("\t\nACK\n\t\tSender: %d \n\t\tReceiver: %d\n\t\tMessage_id: %d\n\t\tTime: ", ack.pid_sender, ack.pid_receiver, ack.message_id);
+            printf("\t%s\n", asctime(localtime( & ack.timestamp)));
 
             //DEBUG: stampa del messaggio di conferma ack
             printf("[✓] Ack was written suceffully.\n\n");
 
             // Appertura semaforo
+            semOp(semID, 6, 1);
 
           }
         } while (bR != 0);
 
         semOp(semID, 6, 1);
 
-        ////
         // SCRITTURA MESSAGGI
-        ////
+        // - - - - - - - - - - - - - - - 
 
         //						abbiamo un messaggio? 	Ho ancora questo messaggio?
         //												|									|
         //												v									|
-        for (int i = 0; i < lastposition; i++) { //  V
+        for (int i = 0; i < lastposition; i++) { // V
           for (int receiver = 0; receiver < 5 && inbox[i].firstSent == 0; receiver++) {
-            double dist = distanceCalculator(
+
+						// Calcolo distanza euclidea tra due device
+						double dist = distanceCalculator(
               positionMatrix[step][2 * child], // x 1
               positionMatrix[step][2 * child + 1], // y 1
               positionMatrix[step][2 * receiver], // x 2
@@ -324,11 +387,18 @@ int main(int argc, char * argv[]) {
 						int tmp_messageID = inbox[i].msg.message_id;
 
 						/*
-						Se 1: il messaggio può essere spedito al dato receiver 
-						Se 0: il messaggio è già stato ricevuto dal dato receiver
+						Controlla 
+						Se 1: il messaggio può essere spedito
+						Se 0: il messaggio è già stato ricevuto
 						*/
-						int flag = check_receive_acklist(tmp_messageID, child_pid[receiver]);
+						int flag1 = check_receive_acklist(tmp_messageID, child_pid[receiver]);
 
+						/*
+						Controlla 
+						Se 1: il messaggio può essere spedito
+						Se 0: il messaggio è già stato ricevuto
+						*/
+						int flag2 = first_last_sender_check(tmp_messageID, inbox[i].msg.pid_sender);
 						/* 
 						Se accede al codice dell'if inserisce l'ack nella lista. Condizioni: 
 						 1) distanza appropriata 
@@ -337,31 +407,37 @@ int main(int argc, char * argv[]) {
 						 4) flag di ricezione da acklist
 						*/
 
+						// Se flag2 == 0 il device è l'ultimo dei 5 ad aver ricevuto il messaggio -> deve toglierlo dalla priopria coda.
+						if(flag2 == 0){
+							//DEBUG: stampa conferma cancellazione ultimo messaggio da device
+							printf("\n\The message from the last device is removed\n");
+							inbox[i].firstSent = 1;
+						}
 
-						//DEBUG: printf("<D%d->D%d> Condizioni: %d %d %d %d\n",child,receiver,dist <= inbox[i].msg.max_distance,step != 0,receiver != child,flag == 1);
-            if (dist <= inbox[i].msg.max_distance && step != 0 && receiver != child && flag == 1) {	
-
-							
+						
+            if (dist <= inbox[i].msg.max_distance && step != 0 && receiver != child && flag1 == 1 && flag2 == 1) {	
               // Invio del messaggio via fifo
               pid_t pid_receiver = child_pid[receiver];
 
+							// Formulazione path per fifo ricevente
               char path2fifoWR[100];
               sprintf(path2fifoWR, "./fifo/dev_fifo.%d\n", pid_receiver);
 
-              // Appertura della fifo del ricevente
+              // Appertura con check della fifo del ricevente
               int fd_write = open(path2fifoWR, O_WRONLY);
               if (fd_write == -1)
                 errExit("[x] device can't open the receiver device fifo");
 
               inbox[i].msg.pid_sender = getpid();
 
-              // Scrittura del messaggio nella fifo del device ricevente 
+              // Scrittura con check del messaggio nella fifo del ricevente 
               if (write(fd_write, & inbox[i].msg, sizeof(inbox[i].msg)) == -1)
                 errExit("[x] Device couldn't send message to another device");
 
               // Chiusura del file descriptor
               close(fd_write);
 
+							// Flag di segnalazione di invio
               inbox[i].firstSent = 1;
 
               //DEBUG: stampa di conferma invio
@@ -370,14 +446,13 @@ int main(int argc, char * argv[]) {
 						
 						// Appertura semaforo ack list
 						semOp(semID, 6, 1);
-
           }
         }
 
-        ////
-        // STAMPA SITUAZIONE
-        ////
+        // STAMPE VARIE
+        // - - - - - - - - - - - - - - - 
 
+				// Stampa dei messaggi ancora non inviati di un device
         printf("<D%d -> %d> (%d,%d) | msgs: ", child, getpid(), positionMatrix[step][2 * child], positionMatrix[step][2 * child + 1]);
 
         if (lastposition == 0)
@@ -392,9 +467,8 @@ int main(int argc, char * argv[]) {
         printf("\n");
         fflush(stdout);
 
-        ////
         // MOVIMENTO
-        ////
+        // - - - - - - - - - - - - - - - 
 
         // Calcolo posizione i-esimo device (row, col) [post invio e ricezione]
         int nextrow = positionMatrix[step][2 * child];
@@ -411,7 +485,7 @@ int main(int argc, char * argv[]) {
           semOp(semID, child + 1, 1);
 
         if (child == 4) {
-          semOp(semID, 5, 1); // riapri l'accesso alla board x il server
+          semOp(semID, 5, 1); // riapre l'accesso alla board x il server
         }
       }
 
@@ -419,40 +493,40 @@ int main(int argc, char * argv[]) {
     }
   }
 
-  ////
-  // ACK MANAGER
-  ////
 
-  // Fork del processo
+  // - - - - - - - - - - - - - - - 
+  // CODICE ACK MANAGER
+  // - - - - - - - - - - - - - - - 
+
+  // Fork con check del processo
   ack_manager = fork();
-	
-  // Check
   if (ack_manager == -1)
     errExit("[x] Ack manager fork() failed.");
-		
-  // While con check della ack_list ogni 5 secondi
+
+	//Codice ack manager
+
   if (ack_manager == 0) {
 
-		// Creazione nuova msg queue mediante key passata come parametro (server)
+		// Creazione con check della msg queue mediante key passata come parametro (server)
 		*msgqueueID = msgget(atoi(argv[1]), IPC_CREAT | IPC_EXCL);
 		if(*msgqueueID == -1)
 		  errExit("[x] Message queue creation failed! ");
-
 		printf("\n[✓] Message queue: created. :D\n");
 
-
+		// Ciclo con attesa di 5 secondi nel quale vi è il check degli acklist ed eventuale cancellazione
+		// - - - - - - - - - - - - - - - 
     while (1) {
       sleep(5);
 
-      // Chiusura del semaforo
+      // Chiusura del semaforo della ack list
       semOp(semID, 6, -1);
 
       for (int i = 0; i < ACK_LIST_SIZE; i++) {
-        // Viene passato il valore id per eseguire un doppio controllo
-				
+		
 				// Controlla se ci sono 5 ack con medesimo ID
 				if (ack_list[i].message_id != 0 && ack_list_checker(ack_list[i].message_id, position2free)){
-          // Imposta a 0 il messagge ID dato nella ack_list
+          
+					// Imposta a 0 il messagge ID dato nella ack_list
 					clean_ack_list(position2free);
 					
 					//DEBUG: stamap di successo
@@ -460,14 +534,14 @@ int main(int argc, char * argv[]) {
         }
       }
 
-      // Appertura del semaforo
+      // Appertura del semaforo della ack list
       semOp(semID, 6, 1);
     }
   }
-
-  ////////////////////////////////////////////////
-  //   				GESTIONE DEGLI STEP								//
-  ////////////////////////////////////////////////
+  
+  // - - - - - - - - - - - - - - - 
+	// STAMPE E GESTIONE STEP	
+	// - - - - - - - - - - - - - - - 
 
   clearBoad(board);
 
@@ -508,6 +582,8 @@ int main(int argc, char * argv[]) {
     printf("\n");
   }
 
+	// ATTESA CHIUSURA FIGLI E TERMINAZIONE
+	// - - - - - - - - - - - - - - - 
 
   // Kill processo ack manager
   kill(ack_manager, SIGTERM);
@@ -517,11 +593,7 @@ int main(int argc, char * argv[]) {
   while (wait(NULL) != -1);
 
   //DEBUG: qui i figli sono morti :( 
-  printf("\n[✓] Tutti i bambini sono andati a letto.\n");
-
-  ////////////////////////////////////////////////
-  //       					CHIUSURA  		    				  //
-  ////////////////////////////////////////////////
+  printf("\n[✓] All child proces are terminated.\n");
 
   printf("\n\n-- Ending --\n\n");
 
@@ -723,15 +795,72 @@ void clean_ack_list(int * position2free) {
 }
 
 /*
-Controlla se esiste un ack per un messaggio prima dell'invio di un messaggio
-da parte di un device verso un device ricevente
+Controlla se esiste un ack per un dato messaggio. Esegue il controllo prima dell'invio di un messaggio verso un device ricevente.
+
+Valori di ritorno:
+	- 0: se c'è l'ack
+	- 1: se non c'è l'ack
+
 */
 int check_receive_acklist(int tmp_messageID, pid_t child_pid){
 	int res = 1;
+	
 	for(int i = 0; i < ACK_LIST_SIZE; i++){
 		if(ack_list[i].message_id == tmp_messageID && ack_list[i].pid_receiver == child_pid)
 			res = 0;	
 	}
 	
 	return res;
+}
+
+/*
+
+
+Controlla se il device che possiede il messaggio con dato message_id è il primo a ricevere tale messaggio (da un client) oppure se è l'ultimo ad averlo ricevuto.
+
+Il controllo si basa su sender del messaggio (se diverso da pid di device -> client).
+
+Valori di ritorno:
+	- 0: se è l'ultimo device ad aver ricevuto il messaggio;
+	- 1: se è un device che può inviare il messaggio.
+*/
+int first_last_sender_check(int tmp_messageID, int pid_sender){
+	int numberAck = 0;
+	int isFirstLast = 1;
+	int tmp;
+
+	// Controlla se ci sono (mediante o non esclusivo) altri ack nella ack_list (un controllo per figlio)
+	for(int i = 0; i < 5; i++){
+		// Se = 1 indica che il device è il primo o l'ultimo
+
+		tmp = check_receive_acklist(tmp_messageID, child_pid[i]);
+
+		if(tmp == 0)
+			numberAck++;
+
+		// Esegue il controllo
+		if(child_pid[i] != getpid()){
+			isFirstLast = isFirstLast * tmp;
+		}
+	}
+
+	if(numberAck == 5){
+		return 0;
+	}
+
+	// Se = 0 indica che il device è di mezzo
+	if(isFirstLast == 0)
+		return 1; //perché può spedire normalmente.
+
+
+	// Bisogna controllare se è il primo o l'ultimo
+	else{
+		// Se è il primo spedisce normalemente -> controllo su pid sender (!= child_pid)
+		for(int k = 0; k < 5; k++){
+			if(pid_sender == child_pid[k])
+				// se flag = 0, allora NON è il primo, ma l'ultimo (altri casi esclusi da for precedente)
+				return 0; 
+		}
+	return 1;
+	}	
 }
