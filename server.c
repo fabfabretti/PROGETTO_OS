@@ -3,6 +3,11 @@
 
 #include "defines.h"
 
+#define TICK "[\033[1;32m✓\033[0m]"
+
+// Tempo di attesa post movimento
+#define SLEEP_TIME 3
+
 ////////////////////////////////////////////////
 //       			VARIABILI "GLOBALI"     			  //
 ////////////////////////////////////////////////
@@ -34,11 +39,13 @@ int shm_ackmsgID = 0;
 Acknowledgement * ack_list; 
 
 
+
 // SEMAFORI
 // - - - - - - - - - - - - - - - 
 
 // Contiene l'ID dell'insieme di semafori
 int semID = 0; 
+
 
 
 // BOARD
@@ -59,8 +66,6 @@ int * msgqueueID;
 
 // Contiene la chiave della message queue
 int msgqueueKEY; 
-
-
 
 // Puntatore all'array contente il path del file posizioni
 char * path2file; 
@@ -131,9 +136,10 @@ int main(int argc, char * argv[]) {
   //       			INIZIALIZZAZIONE
   // - - - - - - - - - - - - - - - 
 
-  printf("\n-- Inizializations -- \n");
+	printf("\n\033[1;36m\t\t\t\t\tGreetings, I'm Father.\n\t\t( ・_・)ノ\tShould you ever be in need of\n\t\t\t\t\tkilling me, my pid is \033[0m%d\033[1;36m.\033[0m\n\n\n",getpid());
 
-	printf("[!!!!] I'm Father. My pid is %d,should u kill me\n",getpid());
+  printf("\t\t\t\t\033[1;32m-- Inizializations -- \033[0m\n\n");
+
 
 
   // FIFO
@@ -144,7 +150,7 @@ int main(int argc, char * argv[]) {
 
   open_filePosition(path2file);
   // Appertura file posizioni indicato dal path inserito a terminale
-  printf("\n[✓] file_posizioni.txt loaded\n\n");
+  printf("%s File input \"file_posizioni.txt\"loaded\n\n",TICK);
 
   //DEBUG: Stampa delle posizioni lette
   //printPosition();
@@ -156,8 +162,8 @@ int main(int argc, char * argv[]) {
   // Creazione del set di semafori
   semID = semget(IPC_PRIVATE, 7, S_IRUSR | S_IWUSR);
   if (semID == -1)
-    errExit("[x] <Server> Semaphore creation failed!\n");
-  printf("[✓] Semaphore set: created\n");
+    errExit("<Server> Semaphore creation failed!\n");
+  printf("%s Semaphore set: created ",TICK);
 
 	// Array contente il valore iniziale dei semafori
 	unsigned short semInitVal[] = {
@@ -177,7 +183,7 @@ int main(int argc, char * argv[]) {
   // Inizializzazione set semafori
   if (semctl(semID, 0, SETALL, arg) == -1)
     errExit("[x] <Server> initialization semaphore set failed\n");
-  printf("[✓] Semaphore set: initialized\n\n");
+  printf("and initialized\n\n");
 
 
   // SHARED MEMORY
@@ -191,7 +197,7 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   board = (board_t * ) get_shared_memory(shm_boardID, 0);
 
-  printf("[✓] Board: shared memory allocated and initialized\n\n");
+  printf("%s Board: shared memory allocated and initialized\n\n",TICK);
 
   // - - ACKLIST - -
 
@@ -201,7 +207,7 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   ack_list = (Acknowledgement * ) get_shared_memory(shm_ackmsgID, 0);
 
-  printf("[✓] Acklist: sahred memory allocated and initialized\n\n");
+  printf("%s Acklist: shared memory allocated and initialized\n\n",TICK);
 
   // - - ARRAY PID - -
 
@@ -211,7 +217,7 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   child_pid = (pid_t * ) get_shared_memory(shm_pidArrayID, 0);
 
-  printf("[✓] Pid array: sahred memory allocated and initialized\n\n");
+  printf("%s Pid array: shared memory allocated and initialized\n\n",TICK);
 
 	// - - MSG QUEUE - - 
 
@@ -221,7 +227,7 @@ int main(int argc, char * argv[]) {
   // Attachnment segmento shared memory della board
   msgqueueID = (int *) get_shared_memory(msgqueueKEY, 0);
 
-  printf("[✓] Message queue ID: sahred memory allocated and initialized\n\n");
+  printf("%s Message queue ID: shared memory allocated and initialized\n\n",TICK);
 
 
   // SIGHANDLER
@@ -239,17 +245,17 @@ int main(int argc, char * argv[]) {
 	sigprocmask(SIG_SETMASK, &mySet, NULL);
 
 	if(signal(SIGTERM, sigHandler) == SIG_ERR)
-		errExit("[x] Failed to set sigHandler");
+		errExit("Failed to set sigHandler");
 
 	//DA COMMENTARE
 	if(signal(SIGINT, sigHandler) == SIG_ERR)
-		errExit("[x] Failed to set sigHandler");
+		errExit("Failed to set sigHandler");
 	
   // - - - - - - - - - - - - - - - 
   // CODICE ESEGUITO DAL SERVER 
   // - - - - - - - - - - - - - - - 
 
-  printf("\n\t\t\t  -- Operations -- \n");
+  printf("\n\n\t\t\t\t\t\033[1;32m-- Operations -- \033[0m\n");
 
   // - - - - - - - - - - - - - - - 
   // CREAZIONE E CODICE DEVICES 
@@ -285,9 +291,9 @@ int main(int argc, char * argv[]) {
 
 			//COMMENTARE:
 			if(signal(SIGINT, SIG_DFL) ==SIG_ERR)
-			errExit("[x] Couldn't reset sighandler!!");
+			errExit("Couldn't reset SIGINT sighandler!!");
 			if(signal(SIGTERM, SIG_DFL) ==SIG_ERR)
-			errExit("[x] Couldn't reset sighandler!!");
+			errExit("Couldn't reset SIGTERM sighandler!!");
 
 			// FIFO
 			// - - - - - - - - - - - - - - - 
@@ -297,12 +303,12 @@ int main(int argc, char * argv[]) {
 
       // Creazione fifo (col nome appropriato appena trovato.)
       if (mkfifo(path2fifo, S_IRUSR | S_IWUSR) == -1)
-        errExit("\n[x] A device failed to create the fifo");
+        errExit("A device failed to create the fifo");
 
       // Appertura della fifo 
       int fd_fifo = open(path2fifo, O_RDONLY | O_NONBLOCK);
       if (fd_fifo == -1)
-        errExit("[x] Device Could not open fifo :(");
+        errExit("A device Could not open fifo");
 
 
 			// MESSAGGI, INBOX, LETTURA, CREAZIONE E GESTIONE ACK, MOVIMENTO
@@ -337,11 +343,11 @@ int main(int argc, char * argv[]) {
 					*/
           bR = read(fd_fifo, & msg, sizeof(msg));
           if (bR == -1)
-            errExit("[x] Device couldn't read fifo :(");
+            errExit("The device couldn't read fifo :(");
 
           if (bR != 0) {
 						//DEBUG: notifica nuovo messaggio
-            printf("\n[+] **** <D%d> has new message!\n", child);
+            printf("\033[0;93m[+] <D%d> I received message %d ", child,msg.message_id);
 
             // Scrittura del messaggio in inbox[lastposition]
             inbox_t msgarrivo = {
@@ -381,14 +387,14 @@ int main(int argc, char * argv[]) {
 
             // Inserimento ack in ack_list
             ack_list[z] = ack;
-
+						/*
             //DEBUG: stampa ack
             printf("\t\nACK\n\t\tSender: %d \n\t\tReceiver: %d\n\t\tMessage_id: %d\n\t\tTime: ", ack.pid_sender, ack.pid_receiver, ack.message_id);
             printf("\t%s\n", asctime(localtime( & ack.timestamp)));
-
+						*/
             //DEBUG: stampa del messaggio di conferma ack
-            printf("[✓] Ack was written suceffully.\n\n");
-
+            printf("and wrote its ack.\033[0m\n");
+					
             // Appertura semaforo
             semOp(semID, 6, 1);
 
@@ -436,7 +442,7 @@ int main(int argc, char * argv[]) {
 						// Se flag2 == 0 il device è l'ultimo dei 5 ad aver ricevuto il messaggio -> deve toglierlo dalla priopria coda.
 						if(flag2 == 0){
 							//DEBUG: stampa conferma cancellazione ultimo messaggio da device
-							printf("\nThe message from the last device is removed\n");
+							printf("\033[0;93m         I was the last one to receive message %d!\n         I removed it from my inbox.\033[0m\n",msg.message_id);
 							inbox[i].firstSent = 1;
 						}
 
@@ -458,13 +464,13 @@ int main(int argc, char * argv[]) {
               // Appertura con check della fifo del ricevente
               int fd_write = open(path2fifoWR, O_WRONLY);
               if (fd_write == -1)
-                errExit("[x] device can't open the receiver device fifo");
+                errExit("Device can't open the receiver device fifo");
 
               inbox[i].msg.pid_sender = getpid();
 
               // Scrittura con check del messaggio nella fifo del ricevente 
               if (write(fd_write, & inbox[i].msg, sizeof(inbox[i].msg)) == -1)
-                errExit("[x] Device couldn't send message to another device");
+                errExit("Device couldn't send message to another device");
 
               // Chiusura del file descriptor
               close(fd_write);
@@ -473,7 +479,7 @@ int main(int argc, char * argv[]) {
               inbox[i].firstSent = 1;
 
               //DEBUG: stampa di conferma invio
-              printf("<D%d> Ho consegnato il messaggio a <D%d>\n", child, receiver);
+              printf("\033[0;93m[-] <D%d> I sent message %d to D%d\n\033[0m", child, msg.message_id, receiver);
             }
 						
 						// Appertura semaforo ack list
@@ -488,12 +494,17 @@ int main(int argc, char * argv[]) {
         printf("<D%d -> %d> (%d,%d) | msgs: ", child, getpid(), positionMatrix[step][2 * child], positionMatrix[step][2 * child + 1]);
 
         if (lastposition == 0)
-          printf("[empty]");
+          printf("\033[0;34m[empty]\033[0m");
         else {
+					int hasPrinted=0;
           for (int i = 0; i < lastposition; i++) {
-            if (inbox[i].firstSent == 0)
+            if (inbox[i].firstSent == 0){
               printf("(id: %d)", inbox[i].msg.message_id);
+							hasPrinted=1;
+							}
           }
+					if(hasPrinted==0)
+          printf("\033[0;34m[\"empty\"]\033[0m");
         }
 
         printf("\n");
@@ -533,7 +544,7 @@ int main(int argc, char * argv[]) {
   // Fork con check del processo
   ack_manager = fork();
   if (ack_manager == -1)
-    errExit("[x] Ack manager fork() failed.");
+    errExit("Ack manager fork() failed.");
 
 	//Codice ack manager
 
@@ -544,16 +555,16 @@ int main(int argc, char * argv[]) {
 
 		//COMMENTARE:
 		if(signal(SIGINT, SIG_DFL) ==SIG_ERR)
-		errExit("[x] Couldn't reset sighandler!!");
+		errExit("Couldn't reset SIGINT sighandler!!");
 		if(signal(SIGTERM, SIG_DFL) ==SIG_ERR)
-		errExit("[x] Couldn't reset sighandler!!");
+		errExit("Couldn't reset SIGTERM sighandler!!");
 
 
 		// Creazione con check della msg queue mediante key passata come parametro (server)
 		*msgqueueID = msgget(atoi(argv[1]), S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
 		if(*msgqueueID == -1)
-		  errExit("[x] Message queue creation failed! ");
-		printf("\n[✓] Message queue: created. :D\n");
+		  errExit("Message queue creation failed! ");
+		printf("\n%s Message queue: created. :D\n",TICK);
 
 		// Ciclo con attesa di 5 secondi nel quale vi è il check degli acklist ed eventuale cancellazione
 		// - - - - - - - - - - - - - - - 
@@ -576,28 +587,31 @@ int main(int argc, char * argv[]) {
 
 					//mtype acquisisce il valore del message id
 					mex.mtype = ack_list[position2free[0]].message_id;
-					
-					printf("\n[!!!!] Array msgqueue creato per il messaggio con id %d\n",ack_list[position2free[0]].message_id);
+
 					for(int j = 0; j < 5; j++){
 						mex.ack_msgq_array[j] = ack_list[position2free[j]];
-						printf("%d   ",ack_list[position2free[j]].pid_sender);
+					//DEBUG:	printf("%d   ",ack_list[position2free[j]].pid_sender);
 					}
+					
+					//printf("\n\033[0;93m<AckManager> I created the ack for message %d.\033[m\n",ack_list[position2free[0]].message_id);
+
 					printf("\n");
 
 
 					// Invio del messaggio con check sulla msg queue
-					if(msgsnd(*msgqueueID, &mex, sizeof(mex) - sizeof(long), IPC_NOWAIT) == -1)
-						errExit("[x] Error in messagequeue");
+					if(msgsnd(*msgqueueID, &mex, sizeof(ack_msgq) - sizeof(long), IPC_NOWAIT) == -1)
+						errExit("Couldn't read the message queue");
 
 					// PULIZIA ACK_LIST
 					// - - - - - - - - - - - - - - - 
-
+					//DEBUG: stamap di successo
+					printf("\033[0;93m<AckManager> All devices have received message %d\n             I sent the acks back to the client.\033[m\n",ack_list[position2free[0]].message_id);
+		
 					// Imposta a 0 il messagge ID dato nella ack_list
 					clean_ack_list(position2free);
 					
-					//DEBUG: stamap di successo
-					printf("\n\n*************Message with id %d correctly received by all of the devices.\n", ack_list[i].message_id);
-        }
+
+		    }
       }
 
       // Appertura del semaforo della ack list
@@ -651,17 +665,19 @@ int main(int argc, char * argv[]) {
 	// ATTESA CHIUSURA FIGLI E TERMINAZIONE
 	// - - - - - - - - - - - - - - - 
 
+
+  printf("\t\t\t\t\t\t\033[1;32m-- Ending -- \033[0m\n\n");
+
   // Kill processo ack manager
   kill(ack_manager, SIGTERM);
-  printf("\n[✓] Ack manager: killed\n");
+  printf("\n%s Ack manager: killed\n", TICK);
 	
   // Prima di procedere con la chiusura attende la terminazione dei device.
   while (wait(NULL) != -1);
 
   //DEBUG: qui i figli sono morti :( 
-  printf("\n[✓] All child proces are terminated.\n");
+  printf("\n%s All children processes have terminated.\n\n",TICK);
 
-  printf("\n\n-- Ending --\n\n");
 
   // Funzione di terminazione, chiude tutto 
   close_all();
@@ -754,12 +770,12 @@ int cleanFifoFolder() {
     if (!(strcmp(next_file -> d_name, "..") == 0) &&
       !(strcmp(next_file -> d_name, ".") == 0))
       if (remove(filepath) != 0)
-        errExit("[x] Cleaning fifo folder failed!");
+        errExit("Cleaning fifo folder failed!");
   }
 
   closedir(cartellaFifo);
 
-  printf("[✓] Fifo folder cleaned\n");
+  printf("%s Fifo folder cleaned\n\n",TICK);
 
   return 0;
 }
@@ -782,32 +798,32 @@ void close_all() {
 	msgctl(*msgqueueID, IPC_RMID, NULL);
 	free_shared_memory(msgqueueID);
   remove_shared_memory(msgqueueKEY);
-  printf("\n[✓] Message queue ID: deattached and removed\n");
+  printf("%s Message queue ID shared memory: deattached and removed\n",TICK);
 
 	//Detach e delete shared memory CHILD_PID
   free_shared_memory(child_pid);
   remove_shared_memory(shm_pidArrayID);
-  printf("\n[✓] Pid array: deattached and removed\n");
+  printf("\n%s Pid array shared memory: deattached and removed\n",TICK);
 
   // Detach  e delete shared memory BOARD
   free_shared_memory(board);
   remove_shared_memory(shm_boardID);
-  printf("\n[✓] Board: deattached and removed\n");
+  printf("\n%s Board shared memory: deattached and removed\n",TICK);
 
   // Detach  e delete shared memory LISTA ACK
   free_shared_memory(ack_list);
   remove_shared_memory(shm_ackmsgID);
-  printf("\n[✓] Acklist: deattached and removed\n");
+  printf("\n%s Acklist shared memory: deattached and removed\n", TICK);
 
   // Remove SEMAPHORE SET
   if (semctl(semID, 0, IPC_RMID, NULL) == -1)
-    errExit("[x] semctl IPC_RMID failed");
-  printf("\n[✓] Semaphore set: deallocated and removed\n\n");
+    errExit("semctl IPC_RMID failed");
+  printf("\n%s Semaphore set: deallocated and removed\n\n", TICK);
 
   if (cleanFifoFolder() != 0)
-    errExit("\n[x] Fifo folder not cleaned ./fifo");
+    errExit("Fifo folder not cleaned");
 
-	printf("\n\n[✓] THE END! :D\n\n");
+	printf("\n\n%s THE END! :D %s\n\n",TICK,TICK);
 }
 
 
@@ -928,10 +944,9 @@ La funzione impedisce a qualunque segnale (eccetto SIGTERM) di terminare il flus
 
 Alla ricezione di un SIGTERM eseguirà la funzione di chiusura.
 */
-void sigHandler(int sig) {
-  printf("\n\nTime to die!.\n");
-
-	printf("The signal SIGTERM was caught.\n");
+void sigHandler(int sig) {	
+	
+	printf("\n\n\t\033[1;36m ( ・_・)  It's time to die. Farewell!\033[0m\n\n");
 	close_all();
   
 	exit(0);

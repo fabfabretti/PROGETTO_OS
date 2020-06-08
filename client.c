@@ -24,16 +24,15 @@ int main(int argc, char * argv[]) {
     exit(1);
   }
 
-  ////////////////////////////////////////////////
-  //       			VARIABILI					      			  //
-  ////////////////////////////////////////////////
 
+// Variabili
+// - - - - - - - - - - - - - - - 
   // Struttura dei messaggi (vedi defines.h -> message)
   message msg;
 
-  ////////////////////////////////////////////////
-  //   				CODICE PROGRAMMA								  //
-  ////////////////////////////////////////////////
+
+// INPUT INFORMAZIONI
+// - - - - - - - - - - - - - - - 
 
   // Assegnazione KEY (ottenuta dal terminale)
   msg.message_id = atoi(argv[1]);
@@ -49,7 +48,7 @@ int main(int argc, char * argv[]) {
   printf("[+] Insert the ID of the messasge (must be > 0): ");
   scanf("%d", &msg.message_id);
 	while(msg.max_distance < 0){
-		printf("\nPleas, insert a value higher than 0.");
+		printf("\nPlease, insert a value higher than 0.");
   	scanf("%d", &msg.message_id);
 	}
 
@@ -65,14 +64,13 @@ int main(int argc, char * argv[]) {
   scanf("%lf", &msg.max_distance);
 	
 	while(msg.max_distance < 0){
-		printf("\nPleas, insert a value higher than 0.");
+		printf("\nPlease, insert a value higher than 0.");
   	scanf("%lf", &msg.max_distance);
 	}
 
-  // DEBUG:
-  //printf("[?] Mando messaggio [%s] a device %d",msg.message,msg.pid_receiver);
 
-  // Ottenimento del path della fifo desiderata
+// SCRITTURA SU FIFO
+// - - - - - - - - - - - - - - - 
   char path2fifo[100];
 
   char * fifopathbase = "./fifo/dev_fifo.";
@@ -87,10 +85,26 @@ int main(int argc, char * argv[]) {
   // Scrittura del messaggio nella fifo
   write(fd, &msg, sizeof(msg));
 
-  printf("[✓] Message sent to device <%d>\n", msg.pid_receiver);
+  printf("[\033[1;32m✓\033[0m] Message sent to device <%d>\n\n", msg.pid_receiver);
 
   // Chiusura fifo
   close(fd);
 
+
+// LETTURA SU MSGQUEUE
+// - - - - - - - - - - - - - - - 
+
+
+int msg_id=msgget(atoi(argv[1]),S_IRUSR);
+if(msg_id==-1)
+	errExit("Couldn't open message queue");
+
+printf("[+] <Client> Waiting for response...");
+
+ack_msgq buffer;
+if(msgrcv(msg_id,&buffer,sizeof(ack_msgq),msg.message_id,0)==-1)
+	errExit("Client couldn't read message queue");
+
+printf("[\033[1;32m✓\033[0m] <Client> Message received correctly!\n");
   return 0;
 }

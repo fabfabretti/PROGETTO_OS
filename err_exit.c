@@ -5,7 +5,11 @@
 
 
 
-void errExit(const char * msg) {
+void errExit(const char * string) {
+	char *msg;
+
+	sprintf(msg,"[\033[1;31mx\033[0m] %s",string);
+
   perror(msg);
   exit(1);
 }
