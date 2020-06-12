@@ -121,8 +121,6 @@ int main(int argc, char * argv[]) {
 
 	sprintf(path2file, "./output/out_message_%d.txt", msg.message_id);
 
-	//DEBUG: stampa path creato x file
-	printf("\nPath del file: %s", path2file);
 
 	int fd_out_file = open(path2file, O_CREAT | O_EXCL | O_TRUNC | O_WRONLY , S_IRWXU |  S_IRWXG |   S_IRWXO );
 	if(fd_out_file == -1)
@@ -180,12 +178,14 @@ int messageIdChecker(int message_id){
 	// Generazione stringa del file di controllo
 	char pathToFifo[20];
 	sprintf(pathToFifo,"./fifo/%d",message_id);
-
+	errno=0;
 	int fd_message_checker = open(pathToFifo, O_RDONLY | O_CREAT | O_EXCL,  S_IRWXU );
-	if(fd_message_checker==-1){
+	if(fd_message_checker==-1 && errno==17){
 		printf("[\033[1;31mx\033[0m] Message ID is already in use!\nPlease insert a valid message id: ");
 		return 1 ;
 		}
+	if(fd_message_checker==-1 && errno!=17)
+		errExit("Client coulndn't check ID correctly");
 
 	return 0;
 /*
