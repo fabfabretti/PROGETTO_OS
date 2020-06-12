@@ -6,7 +6,7 @@
 
 
 void errExit(const char * string) {
-	char *msg;
+	char msg[100];
 
 	sprintf(msg,"[\033[1;31mx\033[0m] %s",string);
 

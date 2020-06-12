@@ -6,7 +6,7 @@
 #define TICK "[\033[1;32m✓\033[0m]"
 
 // Tempo di attesa post movimento
-#define SLEEP_TIME 3
+#define SLEEP_TIME 2
 
 ////////////////////////////////////////////////
 //       			VARIABILI "GLOBALI"     			  //
@@ -81,7 +81,7 @@ void printPosition();
 
 void clearBoad(board_t * board);
 
-int cleanFifoFolder();
+int cleanFolder();
 
 typedef void (*sighandler_t)(int);
 
@@ -146,11 +146,17 @@ int main(int argc, char * argv[]) {
   // - - - - - - - - - - - - - - - 
 
   // Cancellazione file all'interno della cartella fifo
-  cleanFifoFolder();
+  if(cleanFolder("./fifo")!=0)
+		errExit("Couldn't clearn fifo folder");
 
   open_filePosition(path2file);
   // Appertura file posizioni indicato dal path inserito a terminale
   printf("%s File input \"file_posizioni.txt\"loaded\n\n",TICK);
+
+
+	// Pulisci cartella output, per comodità nostra
+  if (cleanFolder("./output") != 0)
+    printf("[\033[1;31mx\033[0m] WARNING: Output folder not cleaned (this is ok if output folder is nonexistant)\n");
 
   //DEBUG: Stampa delle posizioni lette
   //printPosition();
@@ -182,7 +188,7 @@ int main(int argc, char * argv[]) {
 
   // Inizializzazione set semafori
   if (semctl(semID, 0, SETALL, arg) == -1)
-    errExit("[x] <Server> initialization semaphore set failed\n");
+    errExit("<Server> initialization semaphore set failed\n");
   printf("and initialized\n\n");
 
 
@@ -265,7 +271,7 @@ int main(int argc, char * argv[]) {
     pid_t pid = fork();
 
     if (pid == -1)
-      errExit("\n[x] <Server> Devices creation failed");
+      errExit("\n<Server> Devices creation failed");
 
 		// CODICE I-ESIMO FIGLIO
 		// - - - - - - - - - - - - - - - 
@@ -668,6 +674,10 @@ int main(int argc, char * argv[]) {
 
   printf("\t\t\t\t\t\t\033[1;32m-- Ending -- \033[0m\n\n");
 
+
+	printf("Waiting for AckManager to send out any remaining ack...\n");
+	fflush(stdout);
+	sleep(5);
   // Kill processo ack manager
   kill(ack_manager, SIGTERM);
   printf("\n%s Ack manager: killed\n", TICK);
@@ -751,21 +761,22 @@ void printPosition() {
 /*
 Elimina tutti i file contenti nella cartella './fifo'
 */
-int cleanFifoFolder() {
+int cleanFolder(char* folder) {
 
   // These are data types defined in the "dirent" header
-  DIR * cartellaFifo = opendir("./fifo");
+  DIR * cartellaFifo = opendir(folder);
 
   if (cartellaFifo == NULL)
-    errExit("[x] open directory failed");
+    return 1;
 
+else{
   struct dirent * next_file;
 
   char filepath[300];
 
   while ((next_file = readdir(cartellaFifo)) != NULL) {
     // build the path for each file in the folder
-    sprintf(filepath, "%s/%s", "./fifo", next_file -> d_name);
+    sprintf(filepath, "%s/%s", folder, next_file -> d_name);
 
     if (!(strcmp(next_file -> d_name, "..") == 0) &&
       !(strcmp(next_file -> d_name, ".") == 0))
@@ -775,9 +786,10 @@ int cleanFifoFolder() {
 
   closedir(cartellaFifo);
 
-  printf("%s Fifo folder cleaned\n\n",TICK);
+  printf("%s Folder \"%s\" cleaned\n\n",TICK,folder);
 
   return 0;
+	}
 }
 
 /*
@@ -795,6 +807,9 @@ Terminazione di tutte le strutture dati utilizzate.
 */
 void close_all() {
 	//Detach e delete shared memory MSGID
+
+
+
 	msgctl(*msgqueueID, IPC_RMID, NULL);
 	free_shared_memory(msgqueueID);
   remove_shared_memory(msgqueueKEY);
@@ -819,9 +834,10 @@ void close_all() {
   if (semctl(semID, 0, IPC_RMID, NULL) == -1)
     errExit("semctl IPC_RMID failed");
   printf("\n%s Semaphore set: deallocated and removed\n\n", TICK);
-
-  if (cleanFifoFolder() != 0)
-    errExit("Fifo folder not cleaned");
+/*
+  if (cleanFolder("./fifo") != 0)
+    printf("[\033[1;31mx\033[0m] WARNING:Fifo folder not cleaned");
+*/
 
 	printf("\n\n%s THE END! :D %s\n\n",TICK,TICK);
 }
