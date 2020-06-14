@@ -7,19 +7,15 @@
 
 #define TICK "[\033[1;32m✓\033[0m]"
 
-////////////////////////////////////////////////
-//       			VARIABILI GLOBALI	      			  //
-////////////////////////////////////////////////
-
-////////////////////////////////////////////////
-//       	 PROTOTIPI FUNZIONI	         			  //
-////////////////////////////////////////////////
+	////////////////////////////////////////////////
+	//       	 PROTOTIPI FUNZIONI	         			  //
+	////////////////////////////////////////////////
 
 int messageIdChecker(int message_id);
 
-////////////////////////////////////////////////
-//     				  	 MAIN				         			  //
-////////////////////////////////////////////////
+	////////////////////////////////////////////////
+	//     				  	 MAIN				         			  //
+	////////////////////////////////////////////////
 
 int main(int argc, char * argv[]) {
 
@@ -65,7 +61,6 @@ int main(int argc, char * argv[]) {
   // Assegnazione MAX DISTANCE
   printf("[+] Insert the maximum distance the message will reach: ");
   scanf("%lf", &msg.max_distance);
-	
 	while(msg.max_distance < 0){
 		printf("\nPlease, insert a value higher than 0.");
   	scanf("%lf", &msg.max_distance);
@@ -83,7 +78,7 @@ int main(int argc, char * argv[]) {
   // Appertura della fifo
   int fd = open(path2fifo, O_WRONLY);
 	if(fd == -1)
-		errExit("Client can't open the fifo");
+		errExit("Client can't open fifo");
 
   // Scrittura del messaggio nella fifo
   write(fd, &msg, sizeof(msg));
@@ -92,6 +87,8 @@ int main(int argc, char * argv[]) {
 
   // Chiusura fifo
   close(fd);
+
+
 
 
 	// LETTURA DA MSGQUEUE
@@ -126,34 +123,65 @@ int main(int argc, char * argv[]) {
 	if(fd_out_file == -1)
 		errExit("Couldn't create output file");
 
-	// Buffer contente il messaggio che verrà scritto nel file di out
-	char bufferFileTxt[100000];
 
-	// Dopo %s non serve \n perchè è contenuto nel messaggio
-	sprintf(bufferFileTxt, "Messaggio %d: %sLista acknowledgment:\n", msg.message_id, msg.message);
+	// Costruzione delle stringhe!!
 
+	// Buffer che conterrà il messaggio finale
+	char bufferFileTxt[1000];
 
+	// Stringa iniziale col messaggio
+	char tmpIntro[400];
+	sprintf(tmpIntro, "Messaggio %d: %sLista acknowledgment:\n", msg.message_id, msg.message);
+
+	//Stringa degli ack (PIDs + timestamps)
+	//Uso 5 variabili separate perché usando un array di 5 stringhe me le sovrascrive :(
+	char tmpAck0 [100];
+	char tmpAck1 [100];
+	char tmpAck2 [100];
+	char tmpAck3 [100];
+	char tmpAck4 [100];
+	
+	//Stringa di un timestamp
+	char tmpTime[50];
+	
 	for(int j = 0; j < 5; j++){
 
+		//Creazione stringa del timestamp
 		struct tm *time = localtime(&buffer.ack_msgq_array[j].timestamp);
-
-
-		char tmp[500];
-
-		char tmpTime[500];
 		strftime(tmpTime, 100, "%Y-%m-%d %H:%M:%S", time);
 		
-		sprintf(tmp, "%d, %d, %s\n", buffer.ack_msgq_array[j].pid_sender,buffer.ack_msgq_array[j].pid_receiver, tmpTime);
+		//Creazione riga di un ack (dunque, PID sender/receiver + stringa timestamp)
 		
-		sprintf(bufferFileTxt, "%s%s", bufferFileTxt, tmp);
+		char *dest;
+		
+		switch(j){
+		case 0: dest=tmpAck0;
+						break;
+		case 1: dest=tmpAck1;
+						break;
+		case 2: dest=tmpAck2;
+						break;
+		case 3: dest=tmpAck3;
+						break;
+		case 4: dest=tmpAck4;
+						break;
+		}
+		
+		
+		sprintf(dest, "%d, %d, %s\n", buffer.ack_msgq_array[j].pid_sender,buffer.ack_msgq_array[j].pid_receiver, tmpTime);
+		
+		
 	}
+	
+	
 
+		sprintf(bufferFileTxt, "%s%s%s%s%s%s",tmpIntro,tmpAck0, tmpAck1, tmpAck2, tmpAck3, tmpAck4);
+		printf("%s\n",bufferFileTxt);
+		
 	if(write(fd_out_file, bufferFileTxt, sizeof(char) * strlen(bufferFileTxt))==-1)
 		errExit("Client couldn't write on output file.");
 		
 
-
-	//DEBUG: stampa del buffer
 	printf("\033[0;93m<Client> Output generato:\033[0m\n%s\n", bufferFileTxt);
 	printf("\n%s Client terminato correttamente.\n",TICK);
   return (0);
@@ -169,13 +197,16 @@ I valori del risultato possono essere:
 */
 int messageIdChecker(int message_id){
 
-	//controllo semplice: > 0
-	if(message_id<=0){
+	//Primo controllo: ID > 0 ?
+	// - - - - - - - - - - - - -
+	if(message_id <= 0){
 		printf("[\033[1;31mx\033[0m] Message ID must be greater than 0!\nPlease insert a valid message id: ");
 		return 1;
 		}
 
-	// Generazione stringa del file di controllo
+
+	//Secondo controllo: ID è univoco ?
+	// - - - - - - - - - - - - -
 	char pathToFifo[20];
 	sprintf(pathToFifo,"./fifo/%d",message_id);
 	errno=0;
@@ -187,70 +218,5 @@ int messageIdChecker(int message_id){
 	if(fd_message_checker==-1 && errno!=17)
 		errExit("Client coulndn't check ID correctly");
 
-	return 0;
-/*
-	int fd_message_checker = 0, message_id_file;
-
-	char buffer_id[1];
-	char tmp[10];
-
-	fd_message_checker = open("./fifo/message_checker.txt", O_RDWR | O_CREAT ,  S_IRWXU |  S_IRWXG |  S_IRWXO );
-
-	if(fd_message_checker == -1)
-			errExit("Message ID checker couldn't open file");
-			
-	ssize_t bR = 0;
-
-	int primogiro = 1;
-
-	do{
-		printf("### %d\n\n", fd_message_checker);
-		bR = read(fd_message_checker, &buffer_id, sizeof(buffer_id));
-
-		// Primo giro, esce subito
-		if(bR == 0 && primogiro == 1){
-
-			sprintf(tmp,"%d$", message_id);
-
-			if(write(fd_message_checker, &tmp, sizeof(char)*strlen(tmp)) == -1)
-				errExit(("Write in message_checker.txt failed."));
-			//scrivi il nuovo id
-			return 0;	
-			}
-
-		primogiro = 0;
-
-
-		// Check errore
-		if(bR == -1)
-			errExit("Read from file message_checker.txt failed");
-		
-		// Composizione del pid
-		else if (bR != 0 && buffer_id[0] != '$'){
-			sprintf(tmp, "%s%c", tmp, *buffer_id);
-		}
-		// Trasformazione in intero
-		else if(bR != 0 && buffer_id[0] == '$'){
-			message_id_file = atoi(tmp);
-
-			// Check unicità 
-			if(message_id == message_id_file)
-				return 1;
-
-
-		sprintf(tmp, "%s","");				
-		}
-		
-	}while(bR != 0);
-
-
-	sprintf(tmp,"%d$", message_id);
-
-	if(write(fd_message_checker, tmp, sizeof(char) * strlen(tmp)) == -1)
-		errExit(("Write in message_checker.txt failed"));
-
-	return 0;
-	*/
-	
-	
+	return 0;	
 }

@@ -58,6 +58,8 @@ int shm_boardID = 0;
 board_t * board; 
 
 
+
+//// DO I REALLY NEED THIS SHIT?
 // MESSAGE QUEUE
 // - - - - - - - - - - - - - - - 
 
@@ -105,7 +107,7 @@ int first_last_sender_check(int tmp_messageID, int pid_sender);
 
 int main(int argc, char * argv[]) {
 
-  // check command line input arguments
+  // Controllo input da linea di comando
   if (argc != 3) {
     printf("Usage: %s msq_key | %s miss file_posizioni.txt path\n", argv[0], argv[1]);
     exit(1);
@@ -133,7 +135,7 @@ int main(int argc, char * argv[]) {
 
 
   // - - - - - - - - - - - - - - - 
-  //       			INIZIALIZZAZIONE
+  //     	INIZIALIZZAZIONE
   // - - - - - - - - - - - - - - - 
 
 	printf("\n\033[1;36m\t\t\t\t\tGreetings, I'm Father.\n\t\t( ・_・)ノ\tShould you ever be in need of\n\t\t\t\t\tkilling me, my pid is \033[0m%d\033[1;36m.\033[0m\n\n\n",getpid());
@@ -147,8 +149,9 @@ int main(int argc, char * argv[]) {
 
   // Cancellazione file all'interno della cartella fifo
   if(cleanFolder("./fifo")!=0)
-		errExit("Couldn't clearn fifo folder");
-
+    printf("[\033[1;31mx\033[0m] WARNING: Fifo folder not cleaned!\n");
+    
+    
   open_filePosition(path2file);
   // Appertura file posizioni indicato dal path inserito a terminale
   printf("%s File input \"file_posizioni.txt\"loaded\n\n",TICK);
@@ -158,7 +161,7 @@ int main(int argc, char * argv[]) {
   if (cleanFolder("./output") != 0)
     printf("[\033[1;31mx\033[0m] WARNING: Output folder not cleaned (this is ok if output folder is nonexistant)\n");
 
-  //DEBUG: Stampa delle posizioni lette
+  //Stampa delle posizioni lette:
   //printPosition();
 
 
@@ -188,7 +191,7 @@ int main(int argc, char * argv[]) {
 
   // Inizializzazione set semafori
   if (semctl(semID, 0, SETALL, arg) == -1)
-    errExit("<Server> initialization semaphore set failed\n");
+    errExit("<Server> Semaphore set initialization failed\n");
   printf("and initialized\n\n");
 
 
@@ -216,7 +219,7 @@ int main(int argc, char * argv[]) {
   printf("%s Acklist: shared memory allocated and initialized\n\n",TICK);
 
   // - - ARRAY PID - -
-
+  // ! ABBIAMO BISOGNO CHE SIA IN MEMORIA CONDIVISA, PERCHÉ ALTRIMENTI I CHILDREN NON VI ACCEDONO (ovvero, anche dichiarandolo globale, ognuno vede solo la sua copia, la quale è riempita solo per i child a lui precedenti)
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_pidArrayID = alloc_shared_memory(IPC_PRIVATE, 5 * sizeof(pid_t));
 
@@ -225,6 +228,8 @@ int main(int argc, char * argv[]) {
 
   printf("%s Pid array: shared memory allocated and initialized\n\n",TICK);
 
+
+	//SHIT
 	// - - MSG QUEUE - - 
 
 	// Crea il segmento di memoria condivisa da qualche parte nella memoria.
@@ -246,20 +251,20 @@ int main(int argc, char * argv[]) {
 	sigfillset(&mySet);
 	sigdelset(&mySet, SIGTERM);
 	
-	//DA COMMENTARE
+	//SHIT
 	sigdelset(&mySet, SIGINT);
 	sigprocmask(SIG_SETMASK, &mySet, NULL);
 
 	if(signal(SIGTERM, sigHandler) == SIG_ERR)
 		errExit("Failed to set sigHandler");
 
-	//DA COMMENTARE
+	//SHIT
 	if(signal(SIGINT, sigHandler) == SIG_ERR)
 		errExit("Failed to set sigHandler");
 	
-  // - - - - - - - - - - - - - - - 
-  // CODICE ESEGUITO DAL SERVER 
-  // - - - - - - - - - - - - - - - 
+  // - - - - - - - - - - - - - - - - - 
+  // INIZIO ESECUZIONE VERA E PROPRIA 
+  // - - - - - - - - - - - - - - - - -
 
   printf("\n\n\t\t\t\t\t\033[1;32m-- Operations -- \033[0m\n");
 
@@ -321,9 +326,9 @@ int main(int argc, char * argv[]) {
 			// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       while (positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI) {
 				
-				// - - - - - - - - - - - - - - - //
-        // 	ZONA MUTUALMENTE ESCLUSIVA	 //
-				// - - - - - - - - - - - - - - - //
+				// - - - - - - - - - - - - - - - - - - //
+        // QUI E'	ZONA MUTUALMENTE ESCLUSIVA!! //
+				// - - - - - - - - - - - - - - - - - - //
 
 				// Chiusura i-esimo semaforo
         semOp(semID, child, -1);
@@ -349,10 +354,10 @@ int main(int argc, char * argv[]) {
 					*/
           bR = read(fd_fifo, & msg, sizeof(msg));
           if (bR == -1)
-            errExit("The device couldn't read fifo :(");
+            errExit("The device couldn't read its fifo :(");
 
           if (bR != 0) {
-						//DEBUG: notifica nuovo messaggio
+						//Notifica: nuovo messaggio
             printf("\033[0;93m[+] <D%d> I received message %d ", child,msg.message_id);
 
             // Scrittura del messaggio in inbox[lastposition]
@@ -393,16 +398,10 @@ int main(int argc, char * argv[]) {
 
             // Inserimento ack in ack_list
             ack_list[z] = ack;
-						/*
-            //DEBUG: stampa ack
-            printf("\t\nACK\n\t\tSender: %d \n\t\tReceiver: %d\n\t\tMessage_id: %d\n\t\tTime: ", ack.pid_sender, ack.pid_receiver, ack.message_id);
-            printf("\t%s\n", asctime(localtime( & ack.timestamp)));
-						*/
-            //DEBUG: stampa del messaggio di conferma ack
+
+            //Stampa del messaggio di conferma ack
             printf("and wrote its ack.\033[0m\n");
 					
-            // Appertura semaforo
-            semOp(semID, 6, 1);
 
           }
         } while (bR != 0);

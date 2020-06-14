@@ -1,0 +1,28 @@
+######## (1) Terminazione del server
+Da specifica:
+	"Il processo server può essere terminato solamente per mezzo di un segnale SIGTERM"	
+Abbiamo interpretato questa riga nel seguente modo: il processo server può essere terminato *dall'esterno* solo attraverso SIGTERM, ma termina autonomamente e naturalmente quando raggiunge la fine del file.
+
+In particolare, abbiamo aggiunto un'attesa di 5 secondi che assicura che l'ack manager abbia tempo di mandare eventuali ack nel caso in cui, proprio nell'ultimo "step", tutti i device abbiano ricevuto il messaggio.
+
+######## (2) Formato di stampa
+Per semplificarci il lavoro, abbiamo deciso di aggiungere delle stampe aggiuntive che ci aiutassero a capire il comportamento del server (per esempio, aggiungendo una rappresentazione "grafica" della posizione dei devices all'interno della board).Abbiamo avuto cura di lasciare inalterato l'output del client.
+
+
+######## (3) Controllo unicità dell'ID
+Dopo aver provato altre soluzioni forse più convenzionali (come il "segnarci" su un file i message_id già utlizzati), abbiamo deciso di utilizzare una tecnica un po' strana ma più semplice: al momento dell'inserimento dell'ID creiamo un file temporaneo con l'id come nome. Questo ci permette, nelle esecuzioni di altri client, di verificare con semplicità se l'id è stato usato: se i nuovi ID saranno unici riusciremo a creare i relativi files, mentre se un ID è già stato usato la open tornerà -1 con errno=17 (file exists). 
+
+
+######## (4) Struttura dati inbox
+Come da specifica, i messaggi passati sulle fifo utilizzano la struttura Message definita nella specifica. Tuttavia, per capire con facilità se un messaggio è presente nella inbox o meno (dato che per "consegnare un messaggio" non ci serve eliminarlo davvero, ma semplicemente marcarlo come inviato) abbiamo deciso che, all'interno dei device, i messaggi ricevuti vengono incapsulati in una struttura inbox_t che contiene un Message e un flag di invio.
+
+
+
+######## (5) Pulizia cartelle
+Per semplificarci lo sviluppo, abbiamo aggiunto una funzione che pulisce automaticamente la cartella fifo e la cartella output *prima* di iniziare l'esecuzione vera e propria del programma. Inoltre, abbiamo deciso di inserire i file di verifica dell'unicità del message id dentro la cartella fifo, in modo che anch'essi siano "ripuliti" ad ogni esecuzione.
+In questo modo non avremo problemi se, in esecuzioni precedenti:
+		-	Un device aveva lo stesso pid di un device dell'esecuzione attuale, e dunque esiste già una fifo con quel nome;
+		-	Un message_id era già stato usato da un qualche client, e dunque esiste già un out_message con quel nome.
+
+
+

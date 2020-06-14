@@ -5,7 +5,6 @@
 #pragma once
 
 #include "err_exit.h"
-#include "fifo.h"
 #include "semaphore.h"
 #include "shared_memory.h"
 
