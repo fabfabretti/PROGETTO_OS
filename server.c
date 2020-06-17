@@ -251,16 +251,18 @@ int main(int argc, char * argv[]) {
 	sigfillset(&mySet);
 	sigdelset(&mySet, SIGTERM);
 	
-	//SHIT
+	/*
 	sigdelset(&mySet, SIGINT);
 	sigprocmask(SIG_SETMASK, &mySet, NULL);
-
+	*/
+	
 	if(signal(SIGTERM, sigHandler) == SIG_ERR)
 		errExit("Failed to set sigHandler");
 
-	//SHIT
+	/*
 	if(signal(SIGINT, sigHandler) == SIG_ERR)
 		errExit("Failed to set sigHandler");
+	*/
 	
   // - - - - - - - - - - - - - - - - - 
   // INIZIO ESECUZIONE VERA E PROPRIA 
