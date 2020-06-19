@@ -59,15 +59,11 @@ board_t * board;
 
 
 
-//// DO I REALLY NEED THIS SHIT?
 // MESSAGE QUEUE
 // - - - - - - - - - - - - - - - 
 
 // Contiene l'ID memoria condivisa MESSAGE QUEUE
 int * msgqueueID; 
-
-// Contiene la chiave della message queue
-int msgqueueKEY; 
 
 // Puntatore all'array contente il path del file posizioni
 char * path2file; 
@@ -77,29 +73,29 @@ char * path2file;
 //       	 PROTOTIPI FUNZIONI	         			  //
 ////////////////////////////////////////////////
 
-void printBoard(board_t * board);
+void printBoard(board_t * board); //stampa la board con le posizioni dei device; è un aiuto grafico
 
-void printPosition();
+void printPosition(); //stampa le posizioni caricate in memoria; l'abbiamo usata per debug ed è comoda
 
-void clearBoad(board_t * board);
+void clearBoad(board_t * board); //ad ogni "step" elimina dalla board i pid dello step precedente
 
-int cleanFolder();
+int cleanFolder(); //pulisce una cartella; la usiamo per ripulire FIFO e OUTPUT prima di cominciare (in modo tale che non dobbiamo preoccuparci di ripulirle noi "a mano" per evitare errori del tipo "file already exists").
 
-typedef void (*sighandler_t)(int);
+typedef void (*sighandler_t)(int); 
 
-void sigHandler(int sig);
+void sigHandler(int sig); //sighandler
 
-void close_all();
+void close_all(); //fa tutte le chiusure necessarie per terminare; per esempio chiude semafori e msgqueue
 
-char * pathBuilder(pid_t pid_receiver);
+char * pathBuilder(pid_t pid_receiver); //costruisce il percorso per la fifo
 
-int ack_list_checker(int message_id_array, int * position2free);
+int ack_list_checker(int message_id_array, int * position2free); //controlla se un messaggio è stato ricevuto da tutti i device (ovvero se ci sono 5 ack)
 
-void clean_ack_list(int * position2free);
+void clean_ack_list(int * position2free); //rimuove gli ack di un messaggio dopo che questo è stato ricevuto da tutti i device
 
-int check_receive_acklist(int tmp_messageID, pid_t child_pid);
+int check_receive_acklist(int tmp_messageID, pid_t child_pid); //controlla se un messaggio è già stato ricevuto da un certo device
 
-int first_last_sender_check(int tmp_messageID, int pid_sender);
+int first_last_sender_check(int tmp_messageID, int pid_sender); //controlla se questo device è l'ultimo a inviare
 
 ////////////////////////////////////////////////
 //     				  	 MAIN				         			  //
@@ -198,7 +194,7 @@ int main(int argc, char * argv[]) {
   // SHARED MEMORY
   // - - - - - - - - - - - - - - - 
 
-  // - - BOARD - -
+  		// - - BOARD - -
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_boardID = alloc_shared_memory(IPC_PRIVATE, sizeof(board_t));
@@ -208,7 +204,7 @@ int main(int argc, char * argv[]) {
 
   printf("%s Board: shared memory allocated and initialized\n\n",TICK);
 
-  // - - ACKLIST - -
+ 			// - - ACKLIST - -
 
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_ackmsgID = alloc_shared_memory(IPC_PRIVATE, ACK_LIST_SIZE * sizeof(Acknowledgement));
@@ -218,8 +214,8 @@ int main(int argc, char * argv[]) {
 
   printf("%s Acklist: shared memory allocated and initialized\n\n",TICK);
 
-  // - - ARRAY PID - -
-  // ! ABBIAMO BISOGNO CHE SIA IN MEMORIA CONDIVISA, PERCHÉ ALTRIMENTI I CHILDREN NON VI ACCEDONO (ovvero, anche dichiarandolo globale, ognuno vede solo la sua copia, la quale è riempita solo per i child a lui precedenti)
+  		// - - ARRAY PID - -
+
   // Crea il segmento di memoria condivisa da qualche parte nella memoria.
   shm_pidArrayID = alloc_shared_memory(IPC_PRIVATE, 5 * sizeof(pid_t));
 
@@ -227,21 +223,10 @@ int main(int argc, char * argv[]) {
   child_pid = (pid_t * ) get_shared_memory(shm_pidArrayID, 0);
 
   printf("%s Pid array: shared memory allocated and initialized\n\n",TICK);
+  
+  
 
-
-	//SHIT
-	// - - MSG QUEUE - - 
-
-	// Crea il segmento di memoria condivisa da qualche parte nella memoria.
-  msgqueueKEY = alloc_shared_memory(IPC_PRIVATE, sizeof(int));
-
-  // Attachnment segmento shared memory della board
-  msgqueueID = (int *) get_shared_memory(msgqueueKEY, 0);
-
-  printf("%s Message queue ID: shared memory allocated and initialized\n\n",TICK);
-
-
-  // SIGHANDLER
+  // GESTIONE SEGNALI
   // - - - - - - - - - - - - - - - 
 
 	// Set contenente un insieme di segnali
@@ -251,18 +236,12 @@ int main(int argc, char * argv[]) {
 	sigfillset(&mySet);
 	sigdelset(&mySet, SIGTERM);
 	
-	/*
-	sigdelset(&mySet, SIGINT);
+	//Settiamo la maschera appena creata come maschera del processo
 	sigprocmask(SIG_SETMASK, &mySet, NULL);
-	*/
-	
+
 	if(signal(SIGTERM, sigHandler) == SIG_ERR)
 		errExit("Failed to set sigHandler");
 
-	/*
-	if(signal(SIGINT, sigHandler) == SIG_ERR)
-		errExit("Failed to set sigHandler");
-	*/
 	
   // - - - - - - - - - - - - - - - - - 
   // INIZIO ESECUZIONE VERA E PROPRIA 
@@ -280,14 +259,14 @@ int main(int argc, char * argv[]) {
     if (pid == -1)
       errExit("\n<Server> Devices creation failed");
 
-		// CODICE I-ESIMO FIGLIO
+		// CODICE DELL'I-ESIMO FIGLIO
 		// - - - - - - - - - - - - - - - 
     if (pid == 0) {
 
 			// VARIABILI DEL DEVICE
 			// - - - - - - - - - - - - - - - 
 
-      // Contiene il pid dei device nelle rispettive posizioni
+      // Contiene i pid dei device nelle rispettive posizioni
       child_pid[child] = getpid();
 
       // Mantiene traccia dell'ultima cella utilizzata dell'array inbox_t
@@ -302,11 +281,9 @@ int main(int argc, char * argv[]) {
 			// RESET SIGHANDLER
 		  // - - - - - - - - - - - - - - - 
 
-			//COMMENTARE:
-			if(signal(SIGINT, SIG_DFL) ==SIG_ERR)
-			errExit("Couldn't reset SIGINT sighandler!!");
+			//Dato che i figli ereditano i sighandler dal padre, dobbiamo resettarlo a quello di default.
 			if(signal(SIGTERM, SIG_DFL) ==SIG_ERR)
-			errExit("Couldn't reset SIGTERM sighandler!!");
+				errExit("Couldn't reset SIGTERM sighandler!!");
 
 			// FIFO
 			// - - - - - - - - - - - - - - - 
@@ -318,7 +295,7 @@ int main(int argc, char * argv[]) {
       if (mkfifo(path2fifo, S_IRUSR | S_IWUSR) == -1)
         errExit("A device failed to create the fifo");
 
-      // Appertura della fifo 
+      // Appertura della fifo: utilizziamo NONBLOCK per semplificarci il lavoro di sincronizzazione
       int fd_fifo = open(path2fifo, O_RDONLY | O_NONBLOCK);
       if (fd_fifo == -1)
         errExit("A device Could not open fifo");
@@ -328,12 +305,14 @@ int main(int argc, char * argv[]) {
 			// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       while (positionMatrix[step][0] != 999 && step < LIMITE_POSIZIONI) {
 				
+
+				// Chiusura i-esimo semaforo
+        semOp(semID, child, -1);
+        
 				// - - - - - - - - - - - - - - - - - - //
         // QUI E'	ZONA MUTUALMENTE ESCLUSIVA!! //
 				// - - - - - - - - - - - - - - - - - - //
 
-				// Chiusura i-esimo semaforo
-        semOp(semID, child, -1);
 
 				// VARIABILI
 				// - - - - - - - - - - - - - - - 
@@ -351,9 +330,7 @@ int main(int argc, char * argv[]) {
         // RICEZIONE MESSAGGI, INBOX e ACK
         // - - - - - - - - - - - - - - - 
         do {
-					/*
-					Lettura della fifo in ricerca di messaggi e check
-					*/
+					//Lettura della fifo in ricerca di messaggi 
           bR = read(fd_fifo, & msg, sizeof(msg));
           if (bR == -1)
             errExit("The device couldn't read its fifo :(");
@@ -383,15 +360,12 @@ int main(int argc, char * argv[]) {
               .timestamp = time(NULL)
             };
 
-            //DEBUG: stampa della board di debug
-            //printBoard(board);
-
             int z = 0;
 
             // Chiusura semaforo dell'ack list
             semOp(semID, 6, -1);
 
-            // Ciclo utile a scorrere l'ack_list finchè non trova cella libera (message_id == 0)
+            // Ciclo utile a scorrere l'ack_list finchè non trova una cella libera (ovvero con message_id == 0)
             while (ack_list[z].message_id != 0) {
               if (z == ACK_LIST_SIZE)
                 errExit("The ack_list is full.");
@@ -401,7 +375,7 @@ int main(int argc, char * argv[]) {
             // Inserimento ack in ack_list
             ack_list[z] = ack;
 
-            //Stampa del messaggio di conferma ack
+            // Stampa del messaggio di conferma ack
             printf("and wrote its ack.\033[0m\n");
 					
 
@@ -413,7 +387,7 @@ int main(int argc, char * argv[]) {
         // SCRITTURA MESSAGGI
         // - - - - - - - - - - - - - - - 
 
-        //						abbiamo un messaggio? 	Ho ancora questo messaggio?
+        //						abbiamo messaggi? 	    Ho ancora questo messaggio?
         //												|									|
         //												v									|
         for (int i = 0; i < lastposition; i++) { // V
@@ -442,13 +416,15 @@ int main(int argc, char * argv[]) {
 						/*
 						Controlla 
 						Se 1: il messaggio può essere spedito
-						Se 0: il messaggio è già stato ricevuto
+						Se 0: tutti gli altri hanno già ricevuto il messaggio (dunque non può essere spedito.. anzi, va cancellato!)
+						
+						--> E' NECESSARIO perché l'ack manager potrebbe aver già cancellato tutti gli ack (dato che, quando ackmanager trova 5 ack, li cancella e manda la conferma al client). Senza questo controllo, il messaggio ricomincia a girare "da capo".
 						*/
 						int flag2 = first_last_sender_check(tmp_messageID, inbox[i].msg.pid_sender);
 
 						// Se flag2 == 0 il device è l'ultimo dei 5 ad aver ricevuto il messaggio -> deve toglierlo dalla priopria coda.
 						if(flag2 == 0){
-							//DEBUG: stampa conferma cancellazione ultimo messaggio da device
+							// Stampa conferma cancellazione ultimo messaggio da device
 							printf("\033[0;93m         I was the last one to receive message %d!\n         I removed it from my inbox.\033[0m\n",msg.message_id);
 							inbox[i].firstSent = 1;
 						}
@@ -458,7 +434,7 @@ int main(int argc, char * argv[]) {
 						 1) distanza appropriata 
 						 2) non primo step 
 						 3) receiver != sender 
-						 4) flag di ricezione da acklist
+						 4) flag dati dai controlli da acklist (l'altro ha già ricevuto il messaggio & non tutti hanno già ricevuto il messaggio)
 						*/
             if (dist <= inbox[i].msg.max_distance && step != 0 && receiver != child && flag1 == 1 && flag2 == 1) {	
               // Invio del messaggio via fifo
@@ -468,14 +444,14 @@ int main(int argc, char * argv[]) {
               char path2fifoWR[100];
               sprintf(path2fifoWR, "./fifo/dev_fifo.%d\n", pid_receiver);
 
-              // Appertura con check della fifo del ricevente
+              // Appertura della fifo del ricevente
               int fd_write = open(path2fifoWR, O_WRONLY);
               if (fd_write == -1)
                 errExit("Device can't open the receiver device fifo");
 
               inbox[i].msg.pid_sender = getpid();
 
-              // Scrittura con check del messaggio nella fifo del ricevente 
+              // Scrittura del messaggio nella fifo del ricevente 
               if (write(fd_write, & inbox[i].msg, sizeof(inbox[i].msg)) == -1)
                 errExit("Device couldn't send message to another device");
 
@@ -485,7 +461,7 @@ int main(int argc, char * argv[]) {
 							// Flag di segnalazione di invio
               inbox[i].firstSent = 1;
 
-              //DEBUG: stampa di conferma invio
+              // Stampa di conferma invio
               printf("\033[0;93m[-] <D%d> I sent message %d to D%d\n\033[0m", child, msg.message_id, receiver);
             }
 						
@@ -510,8 +486,9 @@ int main(int argc, char * argv[]) {
 							hasPrinted=1;
 							}
           }
+          
 					if(hasPrinted==0)
-          printf("\033[0;34m[\"empty\"]\033[0m");
+          printf("\033[0;34m[\"empty\"]\033[0m"); //Le virgolette ci servono per capire se la inbox è davvero vuota o ha dei messaggi che sono già stati mandati.
         }
 
         printf("\n");
@@ -520,7 +497,7 @@ int main(int argc, char * argv[]) {
         // MOVIMENTO
         // - - - - - - - - - - - - - - - 
 
-        // Calcolo posizione i-esimo device (row, col) [post invio e ricezione]
+        // Calcolo posizione i-esimo device (row, col)
         int nextrow = positionMatrix[step][2 * child];
 
         int nextcol = positionMatrix[step][2 * child + 1];
@@ -535,7 +512,7 @@ int main(int argc, char * argv[]) {
           semOp(semID, child + 1, 1);
 
         if (child == 4) {
-          semOp(semID, 5, 1); // riapre l'accesso alla board x il server
+          semOp(semID, 5, 1); // riapre l'accesso alla board per il server
         }
       }
 
@@ -568,8 +545,8 @@ int main(int argc, char * argv[]) {
 
 
 		// Creazione con check della msg queue mediante key passata come parametro (server)
-		*msgqueueID = msgget(atoi(argv[1]), S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
-		if(*msgqueueID == -1)
+		msgqueueID = msgget(atoi(argv[1]), S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
+		if(msgqueueID == -1)
 		  errExit("Message queue creation failed! ");
 		printf("\n%s Message queue: created. :D\n",TICK);
 
@@ -586,7 +563,7 @@ int main(int argc, char * argv[]) {
 				// Controlla se ci sono 5 ack con medesimo ID
 				if (ack_list[i].message_id != 0 && ack_list_checker(ack_list[i].message_id, position2free)){
           
-					// MSG QUEUE e ACK
+					// INVIO CONFERMA AL CLIENT
 					// - - - - - - - - - - - - - - - 
 
 					// Preparazione messaggio da inviare
@@ -597,7 +574,7 @@ int main(int argc, char * argv[]) {
 
 					for(int j = 0; j < 5; j++){
 						mex.ack_msgq_array[j] = ack_list[position2free[j]];
-					//DEBUG:	printf("%d   ",ack_list[position2free[j]].pid_sender);
+					
 					}
 					
 					//printf("\n\033[0;93m<AckManager> I created the ack for message %d.\033[m\n",ack_list[position2free[0]].message_id);
@@ -606,12 +583,12 @@ int main(int argc, char * argv[]) {
 
 
 					// Invio del messaggio con check sulla msg queue
-					if(msgsnd(*msgqueueID, &mex, sizeof(ack_msgq) - sizeof(long), IPC_NOWAIT) == -1)
+					if(msgsnd(msgqueueID, &mex, sizeof(ack_msgq) - sizeof(long), IPC_NOWAIT) == -1)
 						errExit("Couldn't read the message queue");
 
 					// PULIZIA ACK_LIST
 					// - - - - - - - - - - - - - - - 
-					//DEBUG: stamap di successo
+					
 					printf("\033[0;93m<AckManager> All devices have received message %d\n             I sent the acks back to the client.\033[m\n",ack_list[position2free[0]].message_id);
 		
 					// Imposta a 0 il messagge ID dato nella ack_list
@@ -648,7 +625,8 @@ int main(int argc, char * argv[]) {
     // apri il semaforo del primo device
     semOp(semID, 0, 1);
 
-    // qui eseguono i figli
+    // -- > qui eseguono i figli < --
+    
     semOp(semID, 5, -1);
 
     printBoard(board);
@@ -657,15 +635,14 @@ int main(int argc, char * argv[]) {
 
     clearBoad(board);
 
-    //DEBUG: timer (stampato a video) di countdown per ricezione messaggi
+    // Timer (stampato a video) di countdown per ricezione messaggi
     for (int i = 1; i <= SLEEP_TIME; i++) {
       sleep(1);
       printf("%d... ", SLEEP_TIME - i);
       fflush(stdout);
     }
 
-    // Inizio timer (2s) di attesa post-muovimento
-    // Sleep di n secondi (delta tempo tra muovimento ultimo device e ripresa operazioni)
+
     printf("\n");
   }
 
@@ -690,6 +667,8 @@ int main(int argc, char * argv[]) {
   printf("\n%s All children processes have terminated.\n\n",TICK);
 
 
+	printf("\n\n\t\033[1;36m ( ・_・)  It's time to die. Farewell!\033[0m\n\n");
+
   // Funzione di terminazione, chiude tutto 
   close_all();
 }
@@ -699,8 +678,8 @@ int main(int argc, char * argv[]) {
 //////////////////////////////////////////
 
 /*
-Stampa le posizioni dei singoli device all'interno della board (la quale è vuota).
-*/
+ *Stampa le posizioni dei singoli device all'interno della board 
+ */
 void printBoard(board_t * board) {
   char c = ' ';
   pid_t pid;
@@ -730,7 +709,7 @@ void printBoard(board_t * board) {
       else
         c = ' ';
       printf("|%c ", c);
-      //printf("|%d ", board->board[i][j]);
+      
       fflush(stdout);
 
     }
@@ -760,7 +739,7 @@ void printPosition() {
 }
 
 /*
-Elimina tutti i file contenti nella cartella './fifo'
+Elimina tutti i file contenti nella cartella passata come parametro
 */
 int cleanFolder(char* folder) {
 
@@ -776,7 +755,7 @@ else{
   char filepath[300];
 
   while ((next_file = readdir(cartellaFifo)) != NULL) {
-    // build the path for each file in the folder
+    //costruisce il path verso la cartella
     sprintf(filepath, "%s/%s", folder, next_file -> d_name);
 
     if (!(strcmp(next_file -> d_name, "..") == 0) &&
@@ -807,14 +786,11 @@ void clearBoad(board_t * board) {
 Terminazione di tutte le strutture dati utilizzate.
 */
 void close_all() {
-	//Detach e delete shared memory MSGID
-
-
-
-	msgctl(*msgqueueID, IPC_RMID, NULL);
-	free_shared_memory(msgqueueID);
-  remove_shared_memory(msgqueueKEY);
-  printf("%s Message queue ID shared memory: deattached and removed\n",TICK);
+	//Detach e delete shared memory msgqueue
+	printf("Mess);
+	if(msgctl(msgqueueID, IPC_RMID, NULL)==-1)
+		errExit("Couldn't remove message queue");
+  printf("%s Message queue: removed\n",TICK);
 
 	//Detach e delete shared memory CHILD_PID
   free_shared_memory(child_pid);
@@ -913,17 +889,17 @@ Il controllo si basa su sender del messaggio (se diverso da pid di device -> cli
 
 Valori di ritorno:
 	- 0: se è l'ultimo device ad aver ricevuto il messaggio;
-	- 1: se è un device che può inviare il messaggio.
+	- 1: se è un device che può inviare il messaggio. (ovvero se è il primo o uno di mezzo)
 */
 int first_last_sender_check(int tmp_messageID, int pid_sender){
 	int numberAck = 0;
 	int isFirstLast = 1;
 	int tmp;
 
-	// Controlla se ci sono (mediante o non esclusivo) altri ack nella ack_list (un controllo per figlio)
+	// Controlla se ci sono altri ack nella ack_list (un controllo per figlio)
 	for(int i = 0; i < 5; i++){
-		// Se = 1 indica che il device è il primo o l'ultimo
-
+	
+		// Se = 1 indica che il device è il primo o l'ultimo!
 		tmp = check_receive_acklist(tmp_messageID, child_pid[i]);
 
 		if(tmp == 0)
@@ -935,16 +911,18 @@ int first_last_sender_check(int tmp_messageID, int pid_sender){
 		}
 	}
 
+	//Se ci sono 5 ack significa che il device è certamente l'ultimo (e l'AckManager non aveva ancora cancellato gli ack)
 	if(numberAck == 5){
 		return 0;
 	}
 
 	// Se = 0 indica che il device è di mezzo
 	if(isFirstLast == 0)
-		return 1; //perché può spedire normalmente.
+		return 1; //= può spedire normalmente.
 
 
-	// Bisogna controllare se è il primo o l'ultimo
+	// Se ho 0 ack, potrebbe essere sia il primo che l'ultimo.
+	// Bisogna controllare quale! Lo capisco dal pid sender
 	else{
 		// Se è il primo spedisce normalemente -> controllo su pid sender (!= child_pid)
 		for(int k = 0; k < 5; k++){
@@ -957,13 +935,20 @@ int first_last_sender_check(int tmp_messageID, int pid_sender){
 }
 
 /*
-La funzione impedisce a qualunque segnale (eccetto SIGTERM) di terminare il flusso di esecuzione.
-
-Alla ricezione di un SIGTERM eseguirà la funzione di chiusura.
+	La funzione impedisce a qualunque segnale (eccetto SIGTERM) di terminare il flusso di esecuzione.
+	Alla ricezione di un SIGTERM eseguirà la funzione di chiusura.
 */
 void sigHandler(int sig) {	
 	
 	printf("\n\n\t\033[1;36m ( ・_・)  It's time to die. Farewell!\033[0m\n\n");
+	
+	//Facciamo terminare i figli e l'ack manager
+	
+	for(int i=0;i<5;i++)
+ 	 kill(child_pid[i], SIGTERM);
+ 	
+ 	kill(ack_manager, SIGTERM);
+	
 	close_all();
   
 	exit(0);
