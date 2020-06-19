@@ -62,8 +62,10 @@ board_t * board;
 // MESSAGE QUEUE
 // - - - - - - - - - - - - - - - 
 
+// Contiene l'ID memoria condivisa MESSAGE QUEUE(!!Deve essere condivisa perché la apre l'ack manager)!
+int * msgqueueID;
 // Contiene l'ID memoria condivisa MESSAGE QUEUE
-int * msgqueueID; 
+int msgqueueKEY; 
 
 // Puntatore all'array contente il path del file posizioni
 char * path2file; 
@@ -225,6 +227,19 @@ int main(int argc, char * argv[]) {
   printf("%s Pid array: shared memory allocated and initialized\n\n",TICK);
   
   
+    		// - - MSGQUEUE ID - - //!!!! E' necessario perché la msgqueue viene aperta dall'ack manager!
+    		
+    		//Crea il segmento di memoria condivisa da qualche parte nella memoria.
+    		msgqueueKEY = alloc_shared_memory(IPC_PRIVATE,sizeof(int));
+    		
+    		//Attachement segmento shared memory della queue
+    		msgqueueID = (int*) get_shared_memory(msgqueueKEY,0);
+    		
+    		
+    		
+    		printf("%s Messague queue ID: shared memory allocated and initialized\n\n",TICK);
+    		
+    		
 
   // GESTIONE SEGNALI
   // - - - - - - - - - - - - - - - 
@@ -544,12 +559,11 @@ int main(int argc, char * argv[]) {
 		errExit("Couldn't reset SIGTERM sighandler!!");
 
 
-		// Creazione con check della msg queue mediante key passata come parametro (server)
-		msgqueueID = msgget(atoi(argv[1]), S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
-		if(msgqueueID == -1)
+		// Creazione con check della msg queue mediante key 
+		*msgqueueID = msgget(msgqueueKEY,S_IRUSR| S_IWUSR | IPC_CREAT | IPC_EXCL);
+		if(*msgqueueID == -1)
 		  errExit("Message queue creation failed! ");
-		printf("\n%s Message queue: created. :D\n",TICK);
-	printf("Messagequeue is %d", msgqueueID);
+		printf("\n%s Message queue: created with ID %d :D\n",TICK,*msgqueueID);
 
 		// Ciclo con attesa di 5 secondi nel quale vi è il check degli acklist ed eventuale cancellazione
 		// - - - - - - - - - - - - - - - 
@@ -584,7 +598,7 @@ int main(int argc, char * argv[]) {
 
 
 					// Invio del messaggio con check sulla msg queue
-					if(msgsnd(msgqueueID, &mex, sizeof(ack_msgq) - sizeof(long), IPC_NOWAIT) == -1)
+					if(msgsnd(*msgqueueID, &mex, sizeof(ack_msgq) - sizeof(long), IPC_NOWAIT) == -1)
 						errExit("Couldn't read the message queue");
 
 					// PULIZIA ACK_LIST
@@ -787,11 +801,16 @@ void clearBoad(board_t * board) {
 Terminazione di tutte le strutture dati utilizzate.
 */
 void close_all() {
-	//Detach e delete shared memory msgqueue
-	printf("Messageid is %d\n",msgqueueID);
-	if(msgctl(msgqueueID, IPC_RMID, NULL)==-1)
+
+	//Delete msgqueue
+	printf("Messageid is %d\n",*msgqueueID);
+	if(msgctl(*msgqueueID, IPC_RMID, NULL)==-1)
 		errExit("Couldn't remove message queue");
   printf("%s Message queue: removed\n",TICK);
+  
+	//Detach e delete shared memory msgqueue
+  free_shared_memory(msgqueueID);
+  remove_shared_memory(msgqueueKEY);
 
 	//Detach e delete shared memory CHILD_PID
   free_shared_memory(child_pid);
