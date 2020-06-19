@@ -549,6 +549,7 @@ int main(int argc, char * argv[]) {
 		if(msgqueueID == -1)
 		  errExit("Message queue creation failed! ");
 		printf("\n%s Message queue: created. :D\n",TICK);
+	printf("Messagequeue is %d", msgqueueID);
 
 		// Ciclo con attesa di 5 secondi nel quale vi è il check degli acklist ed eventuale cancellazione
 		// - - - - - - - - - - - - - - - 
@@ -787,7 +788,7 @@ Terminazione di tutte le strutture dati utilizzate.
 */
 void close_all() {
 	//Detach e delete shared memory msgqueue
-	printf("Mess);
+	printf("Messageid is %d\n",msgqueueID);
 	if(msgctl(msgqueueID, IPC_RMID, NULL)==-1)
 		errExit("Couldn't remove message queue");
   printf("%s Message queue: removed\n",TICK);
