@@ -44,6 +44,11 @@ Abbiamo deciso di utilizzare O_NONBLOCK nell'apertura delle fifo da parte dei de
 Il client gestisce correttamente solo messaggi di lunghezza massima 255, dato che questa è la grandezza del msg presente nella specifica.
 
 
+######## (9) SHARED_MEMORY AGGIUNTIVA
+Abbiamo deciso di aggiungere un pezzo di memoria condivisa aggiuntiva che contenesse la message queue key, in quanto questa viene aperta dall'ackmanager (e di conseguenza il server non ne vedrebbe il valore, risultando impossibilitato a chiuderla).
+
+######## (10) FILEs DI GITHUB
+Nell'elaborato sono presenti alcuni file di github (come .gitignore) poiché abbiamo utilizzato (anche) questo mezzo per lavorare a distanza.
 
   
   
